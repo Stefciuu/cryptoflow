@@ -16,6 +16,7 @@ Aplikacja **Crypto Flow Graph Builder** służy do ręcznego budowania grafu prz
 - Walidacja adresów/txid jest rozsądna, ale nie pełna formalnie dla wszystkich wariantów sieci.
 - Sugestie klastrowania BTC są heurystyczne i nie stanowią samodzielnego dowodu.
 - Praca na skali manualnej: docelowo **50-100 węzłów**.
+- Import automatyczny dotyczy obecnie wyłącznie formatu JSON transakcji BTC z blockchain.com.
 
 ### 1.3 Założenia uruchomienia
 - Uruchomienie: dwuklik na `index.html` (Chrome/Edge).
@@ -61,7 +62,8 @@ W `index.html`:
     "layout": "cose",
     "filters": {"...": "..."},
     "timeline": {"...": "..."},
-    "btcSimpleView": false
+    "btcSimpleView": false,
+    "evidenceMode": false
   },
   "evidence": {
     "projectSha256": "hex",
@@ -247,6 +249,13 @@ Każda istotna akcja dopisuje wpis z timestampem:
 - zapis/odczyt projektu,
 - eksport PNG.
 
+## 7.2.1 Tryb dowodowy
+- Opcja UI: `Tryb dowodowy (blokada edycji)`.
+- Po aktywacji:
+  - blokowane są mutacje grafu (dodawanie/usuwanie/edycja/import/undo/redo/load),
+  - event log pozostaje append-only i zapisuje również próby zablokowanych mutacji (`MUTATION_BLOCKED`).
+- Tryb jest zapisywany w `uiState.evidenceMode`.
+
 ## 7.3 Hash SHA-256
 Liczone są:
 - hash JSON projektu (`projectSha256`),
@@ -275,11 +284,13 @@ Aby odtworzyć historię:
 1. Zakładka `Dodaj` -> sekcja `Dodaj węzeł`.
 2. Uzupełnij: `typ`, `chain`, `etykieta` (+ opcjonalnie `address`, `txid`, tagi, note, confidence).
 3. Kliknij `Dodaj węzeł`.
+4. Aplikacja centruje widok na nowym elemencie; duplikaty Address/Tx są blokowane.
 
 ## 8.3 Dodawanie transferów account-based
 1. W `Dodaj transfer` podaj `fromAddress`, `toAddress`, `chain`, `asset`, `amount`.
 2. Uzupełnij `txid`, `timestamp`, `fee`, `direction` opcjonalnie.
 3. Kliknij `Dodaj transfer`.
+4. Duplikat transferu (chain+txid+from+to+asset+amount+timestamp) jest blokowany.
 
 ## 8.4 Dodawanie transakcji BTC UTXO
 1. Sekcja `Dodaj transakcję BTC (UTXO)`.
@@ -287,6 +298,16 @@ Aby odtworzyć historię:
 3. Wpisz `INPUTS` i `OUTPUTS` po jednej pozycji na linię.
 4. Kliknij `Dodaj TX UTXO`.
 5. Aplikacja tworzy: `Address -> Tx -> Address`.
+
+## 8.4.1 Import transakcji BTC z blockchain.com JSON
+1. W zakładce `Dodaj` przejdź do sekcji `Import BTC TX z JSON (blockchain.com)`.
+2. Wklej JSON do pola tekstowego lub wybierz plik `.json`.
+3. Kliknij `Importuj JSON` (lub wybierz plik).
+4. Aplikacja:
+  - waliduje strukturę i pola krytyczne (`txid`, `inputs[]`, `outputs[]`, `time`, `fee`),
+  - konwertuje satoshi -> BTC,
+  - mapuje dane do modelu UTXO (`Address -> Tx -> Address`),
+  - oznacza source jako `blockchain.com-json`.
 
 ## 8.5 Tworzenie klastrów
 1. Zaznacz kilka węzłów.
@@ -318,11 +339,13 @@ Aby odtworzyć historię:
 ## 8.10 Undo/Redo
 - `Ctrl+Z` lub przycisk `Undo`.
 - `Ctrl+Y` lub przycisk `Redo`.
+- W trybie dowodowym undo/redo jest zablokowane.
 
 ## 8.11 Zapis i odczyt JSON
 1. Kliknij `Zapisz` lub `Zapisz projekt (JSON)`.
 2. Aby odczytać: `Wczytaj` i wybierz plik `.json`.
-3. Import przechodzi walidację wersji i kluczowych pól.
+3. Import przechodzi walidację JSON Schema (wersja + pola + typy + zakres confidence).
+4. Raport walidacji jest pokazywany w panelu `Projekt/Eksport -> Walidacja importu JSON Schema`.
 
 ## 8.12 Eksport PNG
 1. Ustaw skalę i tło w `Projekt/Eksport`.
@@ -344,6 +367,7 @@ Aby odtworzyć historię:
 ## 9.3 BTC UTXO
 - [ ] Dodanie BTC TX tworzy poprawnie: inputAddr -> tx -> outputAddr.
 - [ ] Widok uproszczony BTC działa i można wrócić do pełnego.
+- [ ] Import JSON blockchain.com poprawnie tworzy strukturę UTXO.
 
 ## 9.4 Account-based
 - [ ] Transfer ETH/TRON tworzy krawędź address->address.
@@ -371,6 +395,7 @@ Aby odtworzyć historię:
 - [ ] Event log rośnie po akcjach.
 - [ ] Hash projektu i hash pakietu są wyliczane.
 - [ ] Hash PNG aktualizuje się po eksporcie.
+- [ ] Tryb dowodowy blokuje mutacje i loguje próby zmian.
 
 ---
 
@@ -393,10 +418,9 @@ Planowane parsery:
 Wynik parserów mapowany do wspólnego modelu `domain.nodes/edges`.
 
 ## 10.3 Walidacja i twardy schemat
-Plan:
-- JSON Schema v2020-12 dla pliku projektu,
-- migracje wersji (`1.0.x -> 1.1.0`),
-- podpisywanie pakietów dowodowych (np. dodatkowo ECDSA).
+Stan/plan:
+- W MVP wdrożono lokalną walidację zgodną z formalnym schematem JSON `1.0.0` (wersja, pola wymagane, typy, zakresy).
+- Docelowo: pełny JSON Schema v2020-12 + migracje wersji (`1.0.x -> 1.1.0`) + podpisywanie pakietów (np. ECDSA).
 
 ## 10.4 Rozszerzenia analityczne
 Plan:

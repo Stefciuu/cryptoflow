@@ -363,6 +363,63 @@
       background: #eff6ff;
     }
 
+    .schema-report {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px;
+      font-size: 11px;
+      color: #334155;
+      white-space: pre-wrap;
+      line-height: 1.35;
+    }
+
+    .toast-wrap {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: min(380px, calc(100vw - 28px));
+    }
+
+    .toast {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 10px 12px;
+      font-size: 12px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+      animation: toast-in 180ms ease-out;
+    }
+
+    .toast.success {
+      border-color: #86efac;
+      background: #f0fdf4;
+      color: #14532d;
+    }
+
+    .toast.error {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .toast.info {
+      border-color: #bfdbfe;
+      background: #eff6ff;
+      color: #1e3a8a;
+    }
+
+    @keyframes toast-in {
+      from { transform: translateY(6px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
     @media (max-width: 1450px) {
       .main {
         grid-template-columns: 300px 1fr 320px;
@@ -554,6 +611,22 @@
             <textarea id="btcNote" placeholder="Opis transakcji UTXO"></textarea>
             <button id="btnAddBtcTx" class="primary">Dodaj TX UTXO</button>
           </div>
+
+          <div class="card">
+            <h3>Import BTC TX z JSON (blockchain.com)</h3>
+            <label>Wklej JSON transakcji</label>
+            <textarea id="btcJsonInput" placeholder='Wklej obiekt JSON z blockchain.com, np. {"txid":"...","inputs":[...],"outputs":[...]}'></textarea>
+            <div class="row">
+              <div>
+                <button id="btnImportBtcJson" class="primary">Importuj JSON</button>
+              </div>
+              <div>
+                <label>Lub wybierz plik JSON</label>
+                <input id="btcJsonFile" type="file" accept="application/json,.json" />
+              </div>
+            </div>
+            <div class="hint">Import mapuje dane do modelu BTC UTXO: Address -&gt; Tx -&gt; Address. Kwoty satoshi są konwertowane na BTC.</div>
+          </div>
         </div>
 
         <div class="tab-pane" id="tab-edit">
@@ -686,6 +759,11 @@
             <label class="inline"><input id="pngWhiteBg" type="checkbox" checked style="width:auto" /> Białe tło</label>
             <button id="btnExportPng2" class="primary">Eksportuj PNG aktualnego widoku</button>
           </div>
+
+          <div class="card">
+            <h3>Walidacja importu JSON Schema</h3>
+            <div id="schemaReport" class="schema-report">Brak walidacji.</div>
+          </div>
         </div>
 
         <div class="tab-pane" id="tab-evidence">
@@ -707,6 +785,8 @@
             </div>
             <label>Opis / notatki sprawy</label>
             <textarea id="metaNotes" placeholder="Kontekst sprawy"></textarea>
+            <label class="inline"><input id="evidenceMode" type="checkbox" style="width:auto" /> Tryb dowodowy (blokada edycji)</label>
+            <div class="hint" id="evidenceModeInfo">Tryb dowodowy wyłączony.</div>
             <button id="btnApplyMeta" class="primary">Zastosuj metadane</button>
           </div>
 
@@ -822,6 +902,7 @@
       </div>
     </div>
   </div>
+  <div id="toastContainer" class="toast-wrap"></div>
 
   <script>
     (function () {
@@ -832,6 +913,109 @@
         BTC: "#f7931a",
         ETH: "#627eea",
         TRON: "#ef0027"
+      };
+      const CHAIN_SET = new Set(["BTC", "ETH", "TRON"]);
+      const PROJECT_JSON_SCHEMA = {
+        type: "object",
+        required: ["version", "projectMeta", "elements", "domain", "eventLog", "uiState"],
+        properties: {
+          version: { type: "string", const: "1.0.0" },
+          projectMeta: {
+            type: "object",
+            required: ["caseId", "analyst", "createdAt", "updatedAt", "notes"],
+            properties: {
+              caseId: { type: "string" },
+              analyst: { type: "string" },
+              createdAt: { type: "string" },
+              updatedAt: { type: "string" },
+              notes: { type: "string" }
+            }
+          },
+          elements: {
+            type: "object",
+            required: ["nodes", "edges"],
+            properties: {
+              nodes: { type: "array" },
+              edges: { type: "array" }
+            }
+          },
+          domain: {
+            type: "object",
+            required: ["nodes", "edges"],
+            properties: {
+              nodes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "type", "chain", "label", "tags", "note", "confidence", "createdAt", "updatedAt"],
+                  properties: {
+                    id: { type: "string" },
+                    type: { type: "string" },
+                    chain: { type: "string", enum: ["BTC", "ETH", "TRON"] },
+                    label: { type: "string" },
+                    address: { type: "string" },
+                    txid: { type: "string" },
+                    tags: { type: "array" },
+                    note: { type: "string" },
+                    confidence: { type: "number", minimum: 0, maximum: 1 },
+                    externalId: { type: "string" },
+                    createdAt: { type: "string" },
+                    updatedAt: { type: "string" }
+                  }
+                }
+              },
+              edges: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "type", "chain", "asset", "amount", "tags", "note", "confidence", "createdAt", "updatedAt"],
+                  properties: {
+                    id: { type: "string" },
+                    type: { type: "string" },
+                    chain: { type: "string", enum: ["BTC", "ETH", "TRON"] },
+                    asset: { type: "string" },
+                    amount: { type: ["number", "null"] },
+                    txid: { type: "string" },
+                    timestamp: { type: "string" },
+                    fee: { type: ["number", "null"] },
+                    tags: { type: "array" },
+                    note: { type: "string" },
+                    confidence: { type: "number", minimum: 0, maximum: 1 },
+                    sourceId: { type: "string" },
+                    createdAt: { type: "string" },
+                    updatedAt: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          eventLog: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["ts", "actor", "action", "targetType", "targetId"],
+              properties: {
+                ts: { type: "string" },
+                actor: { type: "string" },
+                action: { type: "string" },
+                targetType: { type: "string" },
+                targetId: { type: "string" }
+              }
+            }
+          },
+          uiState: {
+            type: "object",
+            required: ["layout", "filters", "timeline", "btcSimpleView", "evidenceMode"],
+            properties: {
+              layout: { type: "string" },
+              filters: { type: "object" },
+              timeline: { type: "object" },
+              btcSimpleView: { type: "boolean" },
+              evidenceMode: { type: "boolean" }
+            }
+          },
+          evidence: { type: "object" }
+        }
       };
 
       const state = {
@@ -858,7 +1042,8 @@
             max: null,
             hideIsolated: false
           },
-          btcSimpleView: false
+          btcSimpleView: false,
+          evidenceMode: false
         },
         undoStack: [],
         redoStack: [],
@@ -915,6 +1100,9 @@
         btcOutputs: document.getElementById("btcOutputs"),
         btcNote: document.getElementById("btcNote"),
         btnAddBtcTx: document.getElementById("btnAddBtcTx"),
+        btcJsonInput: document.getElementById("btcJsonInput"),
+        btcJsonFile: document.getElementById("btcJsonFile"),
+        btnImportBtcJson: document.getElementById("btnImportBtcJson"),
 
         btnDeleteSelected: document.getElementById("btnDeleteSelected"),
         clusterName: document.getElementById("clusterName"),
@@ -950,6 +1138,7 @@
         btnLoadProject: document.getElementById("btnLoadProject"),
         btnLayout: document.getElementById("btnLayout"),
         btnFit: document.getElementById("btnFit"),
+        schemaReport: document.getElementById("schemaReport"),
         pngScale: document.getElementById("pngScale"),
         pngWhiteBg: document.getElementById("pngWhiteBg"),
         btnExportPng2: document.getElementById("btnExportPng2"),
@@ -959,6 +1148,8 @@
         metaCreatedAt: document.getElementById("metaCreatedAt"),
         metaUpdatedAt: document.getElementById("metaUpdatedAt"),
         metaNotes: document.getElementById("metaNotes"),
+        evidenceMode: document.getElementById("evidenceMode"),
+        evidenceModeInfo: document.getElementById("evidenceModeInfo"),
         btnApplyMeta: document.getElementById("btnApplyMeta"),
 
         hashProject: document.getElementById("hashProject"),
@@ -991,7 +1182,8 @@
         btnDeleteSelection: document.getElementById("btnDeleteSelection"),
 
         statusCounts: document.getElementById("statusCounts"),
-        statusSelection: document.getElementById("statusSelection")
+        statusSelection: document.getElementById("statusSelection"),
+        toastContainer: document.getElementById("toastContainer")
       };
 
       function nowIso() {
@@ -1082,12 +1274,155 @@
         return `${txid.slice(0, 8)}...${txid.slice(-6)}`;
       }
 
+      function showToast(msg, type = "info") {
+        const host = els.toastContainer;
+        if (!host) return;
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.textContent = msg;
+        host.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transform = "translateY(5px)";
+          setTimeout(() => toast.remove(), 180);
+        }, 2600);
+      }
+
       function showError(msg) {
-        window.alert(`Błąd: ${msg}`);
+        showToast(`Błąd: ${msg}`, "error");
       }
 
       function showInfo(msg) {
-        window.alert(msg);
+        showToast(msg, "info");
+      }
+
+      function showSuccess(msg) {
+        showToast(msg, "success");
+      }
+
+      function renderSchemaReport(errors, title = "Raport walidacji") {
+        if (!els.schemaReport) return;
+        if (!errors || !errors.length) {
+          els.schemaReport.textContent = `${title}\nOK - brak błędów.`;
+          return;
+        }
+        els.schemaReport.textContent = `${title}\n${errors.map((e, i) => `${i + 1}. ${e}`).join("\n")}`;
+      }
+
+      function toArrayType(typeDef) {
+        if (!typeDef) return [];
+        return Array.isArray(typeDef) ? typeDef : [typeDef];
+      }
+
+      function valueTypeName(value) {
+        if (value === null) return "null";
+        if (Array.isArray(value)) return "array";
+        return typeof value;
+      }
+
+      function validateBySchema(value, schema, path = "$", errors = []) {
+        if (!schema || typeof schema !== "object") return errors;
+        const types = toArrayType(schema.type);
+        if (types.length) {
+          const actual = valueTypeName(value);
+          const matches = types.some((t) => {
+            if (t === "number") return typeof value === "number" && Number.isFinite(value);
+            if (t === "array") return Array.isArray(value);
+            if (t === "object") return value !== null && typeof value === "object" && !Array.isArray(value);
+            if (t === "null") return value === null;
+            return typeof value === t;
+          });
+          if (!matches) {
+            errors.push(`${path}: oczekiwano typu ${types.join("|")}, otrzymano ${actual}.`);
+            return errors;
+          }
+        }
+
+        if (schema.const !== undefined && value !== schema.const) {
+          errors.push(`${path}: oczekiwano stałej wartości ${JSON.stringify(schema.const)}.`);
+        }
+
+        if (schema.enum && !schema.enum.includes(value)) {
+          errors.push(`${path}: wartość ${JSON.stringify(value)} nie jest dozwolona.`);
+        }
+
+        if (typeof value === "number" && Number.isFinite(value)) {
+          if (schema.minimum !== undefined && value < schema.minimum) {
+            errors.push(`${path}: wartość ${value} < minimum ${schema.minimum}.`);
+          }
+          if (schema.maximum !== undefined && value > schema.maximum) {
+            errors.push(`${path}: wartość ${value} > maximum ${schema.maximum}.`);
+          }
+        }
+
+        if (typeof value === "string") {
+          if (schema.minLength !== undefined && value.length < schema.minLength) {
+            errors.push(`${path}: długość < ${schema.minLength}.`);
+          }
+        }
+
+        if (Array.isArray(value)) {
+          if (schema.minItems !== undefined && value.length < schema.minItems) {
+            errors.push(`${path}: liczba elementów < ${schema.minItems}.`);
+          }
+          if (schema.items) {
+            value.forEach((item, idx) => validateBySchema(item, schema.items, `${path}[${idx}]`, errors));
+          }
+        }
+
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          if (Array.isArray(schema.required)) {
+            schema.required.forEach((field) => {
+              if (!(field in value)) errors.push(`${path}.${field}: pole wymagane.`);
+            });
+          }
+          if (schema.properties && typeof schema.properties === "object") {
+            Object.keys(schema.properties).forEach((prop) => {
+              if (value[prop] !== undefined) {
+                validateBySchema(value[prop], schema.properties[prop], `${path}.${prop}`, errors);
+              }
+            });
+          }
+        }
+
+        return errors;
+      }
+
+      function focusAndSelect(elements) {
+        if (!elements) return;
+        let coll = cy.collection();
+        if (Array.isArray(elements)) {
+          elements.forEach((el) => { if (el) coll = coll.add(el); });
+        } else {
+          coll = coll.add(elements);
+        }
+        if (!coll.length) return;
+        cy.$(":selected").unselect();
+        coll.select();
+        cy.fit(coll, 120);
+      }
+
+      function mutationBlocked(actionName) {
+        if (!state.uiState.evidenceMode) return false;
+        appendEvent("MUTATION_BLOCKED", "policy", actionName, null, { evidenceMode: true });
+        showError(`Tryb dowodowy aktywny. Akcja zablokowana: ${actionName}.`);
+        return true;
+      }
+
+      function refreshEvidenceModeUi() {
+        const locked = !!state.uiState.evidenceMode;
+        const mutationButtons = [
+          els.btnAddNode, els.btnAddTransfer, els.btnAddBtcTx, els.btnImportBtcJson, els.btcJsonFile,
+          els.btnDeleteSelected, els.btnDeleteSelection, els.btnCreateCluster, els.btnClusterFromInputs,
+          els.btnCollapse, els.btnExpand, els.btnEnableEdgeDraw, els.btnDisableEdgeDraw, els.btnUndo,
+          els.btnRedo, els.btnApplySelection, els.btnLoad, els.btnLoadProject
+        ];
+        mutationButtons.forEach((btn) => {
+          if (btn) btn.disabled = locked;
+        });
+        els.evidenceModeInfo.textContent = locked
+          ? "Tryb dowodowy aktywny: edycja grafu zablokowana, log pozostaje append-only."
+          : "Tryb dowodowy wyłączony.";
       }
 
       function chainColor(chain) {
@@ -1310,6 +1645,7 @@
             handleNodes: "node[type != 'Cluster']",
             complete: function (sourceNode, targetNode) {
               if (!state.edgeDrawingEnabled) return;
+              if (mutationBlocked("ADD_EDGE_MANUAL")) return;
               withHistory("Dodanie manual-link", "edge", null, () => {
                 const source = sourceNode;
                 const target = targetNode;
@@ -1336,7 +1672,9 @@
                 edgeData.displayLabel = buildEdgeLabel(edgeData);
                 cy.add({ group: "edges", data: edgeData });
                 appendEvent("ADD_EDGE", "edge", edgeData.id, null, edgeData);
+                focusAndSelect(cy.collection([source, target, cy.getElementById(edgeData.id)]));
               });
+              showSuccess("Dodano manual-link.");
             }
           });
           edgehandles.disable();
@@ -1385,6 +1723,8 @@
         els.btnAddNode.addEventListener("click", addNodeFromForm);
         els.btnAddTransfer.addEventListener("click", addTransferFromForm);
         els.btnAddBtcTx.addEventListener("click", addBtcTxFromForm);
+        els.btnImportBtcJson.addEventListener("click", importBtcJsonFromTextarea);
+        els.btcJsonFile.addEventListener("change", importBtcJsonFromFile);
         els.btnDeleteSelected.addEventListener("click", deleteSelectedWithHistory);
         els.btnDeleteSelection.addEventListener("click", deleteSelectedWithHistory);
         els.btnCreateCluster.addEventListener("click", createClusterFromSelection);
@@ -1401,12 +1741,14 @@
         });
 
         els.btnEnableEdgeDraw.addEventListener("click", () => {
+          if (mutationBlocked("ENABLE_EDGE_DRAW")) return;
           state.edgeDrawingEnabled = true;
           if (edgehandles) edgehandles.enable();
           showInfo("Edgehandles włączone.");
         });
 
         els.btnDisableEdgeDraw.addEventListener("click", () => {
+          if (mutationBlocked("DISABLE_EDGE_DRAW")) return;
           state.edgeDrawingEnabled = false;
           if (edgehandles) edgehandles.disable();
           showInfo("Edgehandles wyłączone.");
@@ -1461,6 +1803,12 @@
 
         els.btnApplyMeta.addEventListener("click", applyMetaFromUi);
         els.btnRehash.addEventListener("click", recomputeHashes);
+        els.evidenceMode.addEventListener("change", () => {
+          state.uiState.evidenceMode = !!els.evidenceMode.checked;
+          refreshEvidenceModeUi();
+          appendEvent("SET_EVIDENCE_MODE", "ui", "evidenceMode", null, { enabled: state.uiState.evidenceMode });
+          showInfo(state.uiState.evidenceMode ? "Tryb dowodowy aktywny." : "Tryb dowodowy wyłączony.");
+        });
 
         els.btnLayout.addEventListener("click", () => {
           withHistory("Przeliczenie layout", "ui", "layout", () => {
@@ -1519,7 +1867,7 @@
 
       function getOrCreateAddressNode(address, chain) {
         const normalized = String(address || "").trim();
-        const existing = cy.nodes().filter((n) => n.data("type") === "Address" && n.data("address") === normalized && n.data("chain") === chain).first();
+        const existing = findAddressNode(normalized, chain);
         if (existing && existing.length) return existing;
 
         const id = makeId("n");
@@ -1542,6 +1890,34 @@
         return cy.getElementById(id);
       }
 
+      function findAddressNode(address, chain) {
+        return cy.nodes().filter((n) => n.data("type") === "Address" && n.data("address") === address && n.data("chain") === chain).first();
+      }
+
+      function findTxNode(chain, txid) {
+        return cy.nodes().filter((n) => n.data("type") === "Tx" && n.data("chain") === chain && n.data("txid") === txid).first();
+      }
+
+      function findDuplicateTransfer(chain, sourceId, targetId, asset, amount, txid, timestamp) {
+        return cy.edges().filter((e) => {
+          const d = e.data();
+          if (d.type !== "transfer") return false;
+          return d.chain === chain
+            && d.source === sourceId
+            && d.target === targetId
+            && String(d.asset || "").toLowerCase() === String(asset || "").toLowerCase()
+            && Number(d.amount) === Number(amount)
+            && String(d.txid || "") === String(txid || "")
+            && String(d.timestamp || "") === String(timestamp || "");
+        }).first();
+      }
+
+      function satsToBtc(sats) {
+        const n = Number(sats);
+        if (!Number.isFinite(n)) return null;
+        return Number((n / 100000000).toFixed(8));
+      }
+
       function normalizeAddressLabel(addr) {
         if (!addr) return "Address";
         if (addr.length <= 14) return addr;
@@ -1556,6 +1932,7 @@
       }
 
       function addNodeFromForm() {
+        if (mutationBlocked("ADD_NODE")) return;
         try {
           const type = els.nodeType.value;
           const chain = els.nodeChain.value;
@@ -1567,6 +1944,22 @@
           assert(label.length > 0, "Etykieta węzła jest wymagana.");
           if (address) assert(isValidAddress(chain, address), `Niepoprawny adres dla chain=${chain}.`);
           if (txid) assert(isValidTxid(chain, txid), `Niepoprawny txid dla chain=${chain}.`);
+          if (type === "Address" && address) {
+            const existing = findAddressNode(address, chain);
+            if (existing && existing.length) {
+              focusAndSelect(existing);
+              showInfo("Węzeł Address dla tego adresu już istnieje. Zaznaczono istniejący element.");
+              return;
+            }
+          }
+          if (type === "Tx" && txid) {
+            const existingTx = findTxNode(chain, txid);
+            if (existingTx && existingTx.length) {
+              focusAndSelect(existingTx);
+              showInfo("Węzeł Tx o tym txid już istnieje. Zaznaczono istniejący element.");
+              return;
+            }
+          }
 
           const nodeData = {
             id: makeId("n"),
@@ -1588,13 +1981,16 @@
             cy.add({ group: "nodes", data: nodeData });
             appendEvent("ADD_NODE", "node", nodeData.id, null, safeClone(nodeData));
             clearNodeForm();
+            focusAndSelect(cy.getElementById(nodeData.id));
           });
+          showSuccess("Dodano węzeł.");
         } catch (err) {
           showError(err.message);
         }
       }
 
       function addTransferFromForm() {
+        if (mutationBlocked("ADD_TRANSFER")) return;
         try {
           const fromAddress = els.trFrom.value.trim();
           const toAddress = els.trTo.value.trim();
@@ -1614,6 +2010,16 @@
           assert(asset.length > 0, "Pole asset jest wymagane.");
           assert(amount !== null && amount >= 0, "Pole amount musi być liczbą >= 0.");
           if (txid) assert(isValidTxid(chain, txid), `Niepoprawny txid dla chain=${chain}.`);
+
+          const existingFrom = findAddressNode(fromAddress, chain);
+          const existingTo = findAddressNode(toAddress, chain);
+          if (existingFrom && existingFrom.length && existingTo && existingTo.length) {
+            const dup = findDuplicateTransfer(chain, existingFrom.id(), existingTo.id(), asset, amount, txid, timestamp);
+            if (dup && dup.length) {
+              focusAndSelect(dup);
+              throw new Error("Wykryto duplikat transferu (chain+txid+from+to+asset+amount+timestamp).");
+            }
+          }
 
           withHistory("Dodanie transferu", "edge", null, () => {
             const fromNode = getOrCreateAddressNode(fromAddress, chain);
@@ -1641,7 +2047,9 @@
             cy.add({ group: "edges", data: edgeData });
             appendEvent("ADD_TRANSFER", "edge", edgeData.id, null, safeClone(edgeData));
             clearTransferForm();
+            focusAndSelect(cy.collection([fromNode, toNode, cy.getElementById(edgeData.id)]));
           });
+          showSuccess("Dodano transfer.");
         } catch (err) {
           showError(err.message);
         }
@@ -1669,7 +2077,129 @@
         return list;
       }
 
+      function addBtcUtxoTransaction(payload) {
+        const txid = String(payload.txid || "").trim();
+        const timestamp = payload.timestamp || null;
+        const fees = parseNum(payload.fees, null);
+        const confidence = clampConfidence(payload.confidence);
+        const note = String(payload.note || "");
+        const sourceId = String(payload.sourceId || "manual");
+        const baseTags = Array.isArray(payload.tags) ? normalizeTags(payload.tags) : ["btc", "utxo"];
+        const inputs = payload.inputs || [];
+        const outputs = payload.outputs || [];
+
+        assert(isValidTxid("BTC", txid), "Niepoprawny BTC txid.");
+        assert(Array.isArray(inputs) && inputs.length > 0, "Wymagany min. 1 input.");
+        assert(Array.isArray(outputs) && outputs.length > 0, "Wymagany min. 1 output.");
+        inputs.forEach((input, idx) => {
+          assert(isValidAddress("BTC", input.address), `Niepoprawny input address #${idx + 1}.`);
+          assert(parseNum(input.amount, null) !== null && parseNum(input.amount, null) >= 0, `Niepoprawna kwota input #${idx + 1}.`);
+        });
+        outputs.forEach((output, idx) => {
+          assert(isValidAddress("BTC", output.address), `Niepoprawny output address #${idx + 1}.`);
+          assert(parseNum(output.amount, null) !== null && parseNum(output.amount, null) >= 0, `Niepoprawna kwota output #${idx + 1}.`);
+        });
+
+        const existingTx = findTxNode("BTC", txid);
+        if (existingTx && existingTx.length) {
+          focusAndSelect(existingTx);
+          throw new Error("Transakcja BTC o tym txid już istnieje.");
+        }
+
+        let txNodeData = null;
+        const createdElements = [];
+        withHistory("Dodanie BTC UTXO TX", "node", txid, () => {
+          txNodeData = {
+            id: makeId("tx"),
+            type: "Tx",
+            chain: "BTC",
+            label: `BTC TX ${shortTx(txid)}`,
+            address: "",
+            txid,
+            tags: baseTags,
+            note,
+            confidence,
+            externalId: "",
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            sourceId,
+            fees,
+            timestamp
+          };
+          cy.add({ group: "nodes", data: txNodeData });
+          createdElements.push(cy.getElementById(txNodeData.id));
+
+          inputs.forEach((input, idx) => {
+            const sourceNode = getOrCreateAddressNode(input.address, "BTC");
+            const edgeData = {
+              id: makeId("e"),
+              type: "utxo-input",
+              source: sourceNode.id(),
+              target: txNodeData.id,
+              chain: "BTC",
+              asset: "BTC",
+              amount: input.amount,
+              txid,
+              timestamp,
+              fee: null,
+              direction: "in",
+              tags: ["utxo", "input"],
+              note: `Input #${idx + 1}`,
+              confidence,
+              sourceId,
+              createdAt: nowIso(),
+              updatedAt: nowIso()
+            };
+            edgeData.displayLabel = buildEdgeLabel(edgeData);
+            cy.add({ group: "edges", data: edgeData });
+            createdElements.push(cy.getElementById(edgeData.id));
+            createdElements.push(sourceNode);
+          });
+
+          outputs.forEach((output, idx) => {
+            const targetNode = getOrCreateAddressNode(output.address, "BTC");
+            const edgeData = {
+              id: makeId("e"),
+              type: "utxo-output",
+              source: txNodeData.id,
+              target: targetNode.id(),
+              chain: "BTC",
+              asset: "BTC",
+              amount: output.amount,
+              txid,
+              timestamp,
+              fee: null,
+              direction: "out",
+              tags: output.isChange ? ["utxo", "output", "change-suspect"] : ["utxo", "output"],
+              note: `Output #${idx + 1}${output.isChange ? " (change?)" : ""}`,
+              confidence,
+              sourceId,
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+              isChange: !!output.isChange
+            };
+            edgeData.displayLabel = buildEdgeLabel(edgeData);
+            cy.add({ group: "edges", data: edgeData });
+            createdElements.push(cy.getElementById(edgeData.id));
+            createdElements.push(targetNode);
+          });
+
+          appendEvent("ADD_BTC_TX", "node", txNodeData.id, null, {
+            txid,
+            inputs,
+            outputs,
+            fees,
+            timestamp,
+            sourceId
+          });
+        });
+
+        focusAndSelect(cy.collection(createdElements));
+        showSuccess("Dodano transakcję BTC UTXO.");
+      }
+
       function addBtcTxFromForm() {
+        if (mutationBlocked("ADD_BTC_TX")) return;
         try {
           const txid = (els.btcTxid.value || "").trim();
           const timestamp = fromInputDateTime(els.btcTimestamp.value);
@@ -1680,95 +2210,109 @@
           assert(isValidTxid("BTC", txid), "Niepoprawny BTC txid.");
           const inputs = parseBtcIoLines(els.btcInputs.value, false);
           const outputs = parseBtcIoLines(els.btcOutputs.value, true);
-          assert(inputs.length > 0, "Wymagany min. 1 input.");
-          assert(outputs.length > 0, "Wymagany min. 1 output.");
-
-          withHistory("Dodanie BTC UTXO TX", "node", txid, () => {
-            const txNodeData = {
-              id: makeId("tx"),
-              type: "Tx",
-              chain: "BTC",
-              label: `BTC TX ${shortTx(txid)}`,
-              address: "",
-              txid,
-              tags: ["btc", "utxo"],
-              note,
-              confidence,
-              externalId: "",
-              createdAt: nowIso(),
-              updatedAt: nowIso(),
-              sourceId: "manual",
-              fees,
-              timestamp
-            };
-            cy.add({ group: "nodes", data: txNodeData });
-
-            inputs.forEach((input, idx) => {
-              const sourceNode = getOrCreateAddressNode(input.address, "BTC");
-              const edgeData = {
-                id: makeId("e"),
-                type: "utxo-input",
-                source: sourceNode.id(),
-                target: txNodeData.id,
-                chain: "BTC",
-                asset: "BTC",
-                amount: input.amount,
-                txid,
-                timestamp,
-                fee: null,
-                direction: "in",
-                tags: ["utxo", "input"],
-                note: `Input #${idx + 1}`,
-                confidence,
-                sourceId: "manual",
-                createdAt: nowIso(),
-                updatedAt: nowIso()
-              };
-              edgeData.displayLabel = buildEdgeLabel(edgeData);
-              cy.add({ group: "edges", data: edgeData });
-            });
-
-            outputs.forEach((output, idx) => {
-              const targetNode = getOrCreateAddressNode(output.address, "BTC");
-              const edgeData = {
-                id: makeId("e"),
-                type: "utxo-output",
-                source: txNodeData.id,
-                target: targetNode.id(),
-                chain: "BTC",
-                asset: "BTC",
-                amount: output.amount,
-                txid,
-                timestamp,
-                fee: null,
-                direction: "out",
-                tags: output.isChange ? ["utxo", "output", "change-suspect"] : ["utxo", "output"],
-                note: `Output #${idx + 1}${output.isChange ? " (change?)" : ""}`,
-                confidence,
-                sourceId: "manual",
-                createdAt: nowIso(),
-                updatedAt: nowIso(),
-                isChange: !!output.isChange
-              };
-              edgeData.displayLabel = buildEdgeLabel(edgeData);
-              cy.add({ group: "edges", data: edgeData });
-            });
-
-            appendEvent("ADD_BTC_TX", "node", txNodeData.id, null, {
-              txid,
-              inputs,
-              outputs,
-              fees,
-              timestamp
-            });
-            clearBtcForm();
+          addBtcUtxoTransaction({
+            txid,
+            timestamp,
+            fees,
+            confidence,
+            note,
+            sourceId: "manual",
+            tags: ["btc", "utxo"],
+            inputs,
+            outputs
           });
+          clearBtcForm();
         } catch (err) {
           showError(err.message);
         }
       }
 
+      function parseBlockchainComTxObject(obj) {
+        assert(obj && typeof obj === "object", "Niepoprawny JSON. Oczekiwany obiekt transakcji.");
+        const txid = String(obj.txid || "").trim();
+        assert(isValidTxid("BTC", txid), "Niepoprawne pole txid.");
+
+        assert(Array.isArray(obj.inputs) && obj.inputs.length > 0, "Brak inputs.");
+        assert(Array.isArray(obj.outputs) && obj.outputs.length > 0, "Brak outputs.");
+
+        const inputAddressSet = new Set();
+        const inputs = obj.inputs.map((input, idx) => {
+          const address = String(input.address || "").trim();
+          const amount = satsToBtc(input.value);
+          assert(isValidAddress("BTC", address), `inputs[${idx}].address jest niepoprawny.`);
+          assert(amount !== null && amount >= 0, `inputs[${idx}].value jest niepoprawny.`);
+          inputAddressSet.add(address);
+          return { address, amount };
+        });
+
+        const outputs = obj.outputs.map((output, idx) => {
+          const address = String(output.address || "").trim();
+          const amount = satsToBtc(output.value);
+          assert(isValidAddress("BTC", address), `outputs[${idx}].address jest niepoprawny.`);
+          assert(amount !== null && amount >= 0, `outputs[${idx}].value jest niepoprawny.`);
+          return { address, amount, isChange: inputAddressSet.has(address) };
+        });
+
+        const ts = Number(obj.time);
+        const timestamp = Number.isFinite(ts) && ts > 0 ? new Date(ts * 1000).toISOString() : null;
+        const fees = satsToBtc(obj.fee);
+        const noteParts = [
+          "Import blockchain.com",
+          Number.isFinite(obj.size) ? `size=${obj.size}` : "",
+          obj.block && Number.isFinite(obj.block.height) ? `height=${obj.block.height}` : ""
+        ].filter(Boolean);
+
+        return {
+          txid,
+          timestamp,
+          fees,
+          confidence: 0.82,
+          note: noteParts.join(", "),
+          sourceId: "blockchain.com-json",
+          tags: ["btc", "utxo", "import:blockchain.com"],
+          inputs,
+          outputs
+        };
+      }
+
+      function importBtcJsonFromTextarea() {
+        if (mutationBlocked("IMPORT_BTC_JSON")) return;
+        try {
+          const raw = (els.btcJsonInput.value || "").trim();
+          assert(raw.length > 0, "Wklej JSON do importu.");
+          const parsed = JSON.parse(raw);
+          const payload = parseBlockchainComTxObject(parsed);
+          addBtcUtxoTransaction(payload);
+          appendEvent("IMPORT_BTC_JSON", "import", payload.txid, null, { source: "textarea", txid: payload.txid });
+          showSuccess("Import blockchain.com JSON zakończony.");
+        } catch (err) {
+          showError(`Import nieudany: ${err.message}`);
+        }
+      }
+
+      async function importBtcJsonFromFile() {
+        if (mutationBlocked("IMPORT_BTC_JSON")) {
+          els.btcJsonFile.value = "";
+          return;
+        }
+        const file = els.btcJsonFile.files && els.btcJsonFile.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          const payload = parseBlockchainComTxObject(parsed);
+          addBtcUtxoTransaction(payload);
+          appendEvent("IMPORT_BTC_JSON", "import", payload.txid, null, { source: file.name, txid: payload.txid });
+          showSuccess(`Zaimportowano: ${file.name}`);
+        } catch (err) {
+          showError(`Import pliku nieudany: ${err.message}`);
+        } finally {
+          els.btcJsonFile.value = "";
+        }
+      }
+
       function createClusterFromSelection() {
+        if (mutationBlocked("CREATE_CLUSTER")) return;
         try {
           const selectedNodes = cy.nodes(":selected").filter((n) => n.data("type") !== "Cluster");
           assert(selectedNodes.length >= 2, "Wybierz minimum 2 węzły (nie-Cluster), aby utworzyć klaster.");
@@ -1804,13 +2348,16 @@
               members: selectedNodes.map((n) => n.id())
             });
             if (expandCollapseApi) expandCollapseApi.collapse(cy.getElementById(clusterId));
+            focusAndSelect(cy.getElementById(clusterId));
           });
+          showSuccess("Utworzono klaster.");
         } catch (err) {
           showError(err.message);
         }
       }
 
       function createClusterFromTxInputs() {
+        if (mutationBlocked("SUGGEST_CLUSTER_COMMON_INPUT")) return;
         try {
           const selectedTx = cy.nodes(":selected").filter((n) => n.data("type") === "Tx" && n.data("chain") === "BTC").first();
           assert(selectedTx.length > 0, "Wybierz jeden węzeł TX (BTC), aby użyć heurystyki common-input.");
@@ -1843,7 +2390,8 @@
               memberAddresses: inputAddrs.map((n) => n.data("address"))
             });
             if (expandCollapseApi) expandCollapseApi.collapse(cy.getElementById(clusterId));
-            showInfo("Utworzono sugerowany klaster. Oznaczony tagiem 'suggested'.");
+            focusAndSelect(cy.getElementById(clusterId));
+            showSuccess("Utworzono sugerowany klaster. Oznaczony tagiem 'suggested'.");
           });
         } catch (err) {
           showError(err.message);
@@ -1851,6 +2399,7 @@
       }
 
       function collapseSelectedCluster() {
+        if (mutationBlocked("COLLAPSE_CLUSTER")) return;
         const selectedClusters = cy.nodes(":selected").filter((n) => n.data("type") === "Cluster");
         if (!selectedClusters.length || !expandCollapseApi) {
           showError("Wybierz klaster i upewnij się, że rozszerzenie expand-collapse jest aktywne.");
@@ -1866,6 +2415,7 @@
       }
 
       function expandSelectedCluster() {
+        if (mutationBlocked("EXPAND_CLUSTER")) return;
         const selectedClusters = cy.nodes(":selected").filter((n) => n.data("type") === "Cluster");
         if (!selectedClusters.length || !expandCollapseApi) {
           showError("Wybierz klaster i upewnij się, że rozszerzenie expand-collapse jest aktywne.");
@@ -1881,6 +2431,7 @@
       }
 
       function deleteSelectedWithHistory() {
+        if (mutationBlocked("DELETE_SELECTED")) return;
         const sel = cy.$(":selected");
         if (!sel.length) {
           showError("Brak zaznaczenia.");
@@ -1892,6 +2443,7 @@
           cy.remove(sel);
           appendEvent("DELETE_SELECTED", "mixed", ids.join(","), { ids }, null);
         });
+        showSuccess("Usunięto zaznaczone elementy.");
       }
 
       function renderSelection() {
@@ -1928,6 +2480,7 @@
       }
 
       function applySelectionEdits() {
+        if (mutationBlocked("UPDATE_SELECTION")) return;
         const selected = cy.$(":selected");
         if (selected.length !== 1) {
           showError("Wybierz dokładnie 1 element do edycji.");
@@ -2247,7 +2800,8 @@
             layout: state.uiState.layout,
             filters: safeClone(state.uiState.filters),
             timeline: safeClone(state.uiState.timeline),
-            btcSimpleView: !!state.uiState.btcSimpleView
+            btcSimpleView: !!state.uiState.btcSimpleView,
+            evidenceMode: !!state.uiState.evidenceMode
           },
           evidence: {
             projectSha256: "",
@@ -2274,46 +2828,24 @@
       }
 
       function validateProjectSchema(obj) {
-        const errors = [];
-
-        if (!obj || typeof obj !== "object") errors.push("Plik nie zawiera obiektu JSON.");
-        if (obj.version !== APP_VERSION) errors.push(`Wersja projektu musi być ${APP_VERSION}.`);
-
-        const meta = obj.projectMeta || {};
-        if (!meta || typeof meta !== "object") errors.push("Brak projectMeta.");
-        ["caseId", "analyst", "createdAt", "updatedAt", "notes"].forEach((k) => {
-          if (!(k in meta)) errors.push(`Brak projectMeta.${k}.`);
-        });
-
-        if (!obj.elements || typeof obj.elements !== "object") {
-          errors.push("Brak elements.");
-        } else {
-          if (!Array.isArray(obj.elements.nodes)) errors.push("elements.nodes musi być tablicą.");
-          if (!Array.isArray(obj.elements.edges)) errors.push("elements.edges musi być tablicą.");
-        }
-
-        if (!obj.domain || typeof obj.domain !== "object") {
-          errors.push("Brak domain.");
-        } else {
-          if (!Array.isArray(obj.domain.nodes)) errors.push("domain.nodes musi być tablicą.");
-          if (!Array.isArray(obj.domain.edges)) errors.push("domain.edges musi być tablicą.");
-        }
-
-        if (!Array.isArray(obj.eventLog)) errors.push("eventLog musi być tablicą.");
+        const errors = validateBySchema(obj, PROJECT_JSON_SCHEMA, "$", []);
+        if (!obj || typeof obj !== "object") return errors;
 
         if (obj.domain && Array.isArray(obj.domain.nodes)) {
           obj.domain.nodes.forEach((n, idx) => {
-            ["id", "type", "chain", "label", "tags", "note", "confidence", "createdAt", "updatedAt"].forEach((k) => {
-              if (!(k in n)) errors.push(`domain.nodes[${idx}].${k} jest wymagane.`);
-            });
+            if (!CHAIN_SET.has(n.chain)) errors.push(`domain.nodes[${idx}].chain musi być BTC/ETH/TRON.`);
+            if (typeof n.confidence !== "number" || n.confidence < 0 || n.confidence > 1) {
+              errors.push(`domain.nodes[${idx}].confidence musi być w zakresie 0..1.`);
+            }
           });
         }
 
         if (obj.domain && Array.isArray(obj.domain.edges)) {
           obj.domain.edges.forEach((e, idx) => {
-            ["id", "type", "chain", "asset", "amount", "tags", "note", "confidence", "createdAt", "updatedAt"].forEach((k) => {
-              if (!(k in e)) errors.push(`domain.edges[${idx}].${k} jest wymagane.`);
-            });
+            if (!CHAIN_SET.has(e.chain)) errors.push(`domain.edges[${idx}].chain musi być BTC/ETH/TRON.`);
+            if (typeof e.confidence !== "number" || e.confidence < 0 || e.confidence > 1) {
+              errors.push(`domain.edges[${idx}].confidence musi być w zakresie 0..1.`);
+            }
           });
         }
 
@@ -2342,6 +2874,8 @@
         refreshMetaUi();
         writeFiltersToUi();
         els.toggleBtcSimple.checked = !!state.uiState.btcSimpleView;
+        els.evidenceMode.checked = !!state.uiState.evidenceMode;
+        refreshEvidenceModeUi();
 
         updateTimelineBounds();
         rebuildBtcSimplifiedView();
@@ -2384,6 +2918,7 @@
       }
 
       function doUndo() {
+        if (mutationBlocked("UNDO")) return;
         const item = state.undoStack.pop();
         if (!item) return;
         state.redoStack.push(item);
@@ -2394,6 +2929,7 @@
       }
 
       function doRedo() {
+        if (mutationBlocked("REDO")) return;
         const item = state.redoStack.pop();
         if (!item) return;
         state.undoStack.push(item);
@@ -2439,9 +2975,12 @@
         els.metaCreatedAt.value = toInputDateTime(state.meta.createdAt || nowIso());
         els.metaUpdatedAt.value = new Date(state.meta.updatedAt || nowIso()).toLocaleString("pl-PL");
         els.metaNotes.value = state.meta.notes || "";
+        els.evidenceMode.checked = !!state.uiState.evidenceMode;
+        refreshEvidenceModeUi();
       }
 
       function applyMetaFromUi() {
+        if (mutationBlocked("UPDATE_META")) return;
         const before = safeClone(state.meta);
         withHistory("Edycja metadanych", "projectMeta", "meta", () => {
           state.meta.caseId = (els.metaCaseId.value || "").trim();
@@ -2451,6 +2990,7 @@
           state.meta.updatedAt = nowIso();
           appendEvent("UPDATE_META", "projectMeta", "meta", before, safeClone(state.meta));
         });
+        showSuccess("Zapisano metadane sprawy.");
       }
 
       function updateStatus() {
@@ -2498,12 +3038,17 @@
             sizeBytes: blob.size,
             hash: project.evidence.projectSha256
           });
+          showSuccess("Projekt zapisany.");
         } catch (err) {
           showError(`Nie udało się zapisać projektu: ${err.message}`);
         }
       }
 
       async function loadProjectFromInputFile() {
+        if (mutationBlocked("LOAD_PROJECT")) {
+          els.fileLoader.value = "";
+          return;
+        }
         const file = els.fileLoader.files && els.fileLoader.files[0];
         if (!file) return;
 
@@ -2511,6 +3056,7 @@
           const text = await file.text();
           const obj = JSON.parse(text);
           const errors = validateProjectSchema(obj);
+          renderSchemaReport(errors, "Walidacja JSON Schema (import)");
           if (errors.length) {
             showError(`Walidacja projektu nie przeszła:\n- ${errors.join("\n- ")}`);
             return;
@@ -2535,6 +3081,7 @@
             state.uiState.filters = (obj.uiState && obj.uiState.filters) ? obj.uiState.filters : defaultFilters();
             state.uiState.timeline = (obj.uiState && obj.uiState.timeline) ? obj.uiState.timeline : state.uiState.timeline;
             state.uiState.btcSimpleView = !!(obj.uiState && obj.uiState.btcSimpleView);
+            state.uiState.evidenceMode = !!(obj.uiState && obj.uiState.evidenceMode);
 
             state.hashes.projectSha256 = obj.evidence && obj.evidence.projectSha256 ? obj.evidence.projectSha256 : "";
             state.hashes.pngSha256 = obj.evidence && obj.evidence.pngSha256 ? obj.evidence.pngSha256 : "";
@@ -2547,6 +3094,8 @@
             renderEventLog();
             refreshHashUi();
             els.toggleBtcSimple.checked = state.uiState.btcSimpleView;
+            els.evidenceMode.checked = state.uiState.evidenceMode;
+            refreshEvidenceModeUi();
 
             updateTimelineBounds();
             rebuildBtcSimplifiedView();
@@ -2560,6 +3109,7 @@
 
           showInfo("Projekt wczytany poprawnie.");
         } catch (err) {
+          renderSchemaReport([err.message], "Walidacja JSON Schema (import)");
           showError(`Nie udało się wczytać pliku: ${err.message}`);
         } finally {
           els.fileLoader.value = "";
@@ -2594,6 +3144,7 @@
             sizeBytes: blob.size
           });
           refreshHashUi();
+          showSuccess("PNG wyeksportowany.");
         } catch (err) {
           showError(`Eksport PNG nieudany: ${err.message}`);
         }
@@ -2735,6 +3286,7 @@
         resetTimelineUi();
         renderEventLog();
         refreshHashUi();
+        renderSchemaReport([], "Walidacja JSON Schema");
       }
 
       function init() {

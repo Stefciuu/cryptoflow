@@ -944,7 +944,8 @@
       "max": 1769947200000,
       "hideIsolated": false
     },
-    "btcSimpleView": false
+    "btcSimpleView": false,
+    "evidenceMode": false
   },
   "evidence": {
     "projectSha256": "",
