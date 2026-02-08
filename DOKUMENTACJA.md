@@ -12,11 +12,12 @@ Aplikacja **Crypto Flow Graph Builder** służy do ręcznego budowania grafu prz
 - zapewnia podstawową **dowodowość** (event log append-only + hash SHA-256).
 
 ### 1.2 Ograniczenia MVP
-- Brak backendu i brak automatycznego pobierania danych z explorerów/API.
+- Brak backendu; pobieranie z API odbywa się wyłącznie bezpośrednio z przeglądarki (opcjonalnie, ręcznie).
 - Walidacja adresów/txid jest rozsądna, ale nie pełna formalnie dla wszystkich wariantów sieci.
 - Sugestie klastrowania BTC są heurystyczne i nie stanowią samodzielnego dowodu.
 - Praca na skali manualnej: docelowo **50-100 węzłów**.
 - Import automatyczny dotyczy obecnie wyłącznie formatu JSON transakcji BTC z blockchain.com.
+- Integracja live API dotyczy obecnie endpointów BTC: `rawtx` i `rawaddr` z `blockchain.info`.
 
 ### 1.3 Założenia uruchomienia
 - Uruchomienie: dwuklik na `index.html` (Chrome/Edge).
@@ -309,6 +310,16 @@ Aby odtworzyć historię:
   - mapuje dane do modelu UTXO direct (`Address -> Address`),
   - oznacza source jako `blockchain.com-json`.
 
+## 8.4.2 Import przez API blockchain.com (blockchain.info)
+1. W sekcji `API blockchain.com (live)`:
+  - podaj `TX hash` i kliknij `Pobierz TX z API i dodaj do grafu`,
+  - albo podaj `Adres BTC`, `Limit TX`, `Offset` i kliknij `Pobierz TX adresu i dodaj do grafu`.
+2. Aplikacja wywołuje:
+  - `https://blockchain.info/rawtx/$tx_hash?cors=true`,
+  - `https://blockchain.info/rawaddr/$address?limit=...&offset=...&cors=true`.
+3. Każda transakcja jest mapowana do modelu `utxo-direct` (`Address -> Address`) i dodawana do grafu.
+4. Duplikaty transakcji (ten sam `txid`) są automatycznie pomijane.
+
 ## 8.5 Tworzenie klastrów
 1. Zaznacz kilka węzłów.
 2. `Edycja` -> `Utwórz klaster z zaznaczonych węzłów`.
@@ -368,6 +379,7 @@ Aby odtworzyć historię:
 - [ ] Dodanie BTC TX tworzy poprawnie przepływy direct: inputAddr -> outputAddr.
 - [ ] Widok uproszczony BTC działa i można wrócić do pełnego.
 - [ ] Import JSON blockchain.com poprawnie tworzy strukturę UTXO.
+- [ ] Import API `rawtx` i `rawaddr` poprawnie tworzy strukturę UTXO.
 
 ## 9.4 Account-based
 - [ ] Transfer ETH/TRON tworzy krawędź address->address.
@@ -407,7 +419,7 @@ Docelowo wydzielić warstwę:
 - `DataProvider.fetchAddress(chain, address)`
 - `DataProvider.fetchTokenTransfers(chain, address|tx)`
 
-W MVP brak wywołań sieciowych.
+W MVP dostępne są podstawowe wywołania BTC `rawtx` i `rawaddr` (blockchain.info) wykonywane z przeglądarki; warstwa `DataProvider` nadal jest kandydatem do wydzielenia.
 
 ## 10.2 Parsery i normalizacja
 Planowane parsery:

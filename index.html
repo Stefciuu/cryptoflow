@@ -627,6 +627,34 @@
             </div>
             <div class="hint">Import mapuje dane do modelu BTC UTXO direct: Address -&gt; Address. Kwoty satoshi są konwertowane na BTC.</div>
           </div>
+
+          <div class="card">
+            <h3>API blockchain.com (live)</h3>
+            <label>TX hash (rawtx)</label>
+            <input id="apiTxHash" type="text" placeholder="Wpisz tx hash i kliknij pobierz" />
+            <button id="btnFetchTxApi" class="primary">Pobierz TX z API i dodaj do grafu</button>
+
+            <div class="row" style="margin-top:8px">
+              <div>
+                <label>Adres BTC (rawaddr)</label>
+                <input id="apiAddress" type="text" placeholder="bc1... / 1... / 3..." />
+              </div>
+              <div>
+                <label>Limit TX (1..50)</label>
+                <input id="apiAddrLimit" type="number" min="1" max="50" step="1" value="20" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Offset</label>
+                <input id="apiAddrOffset" type="number" min="0" step="1" value="0" />
+              </div>
+              <div style="display:flex;align-items:end">
+                <button id="btnFetchAddrApi">Pobierz TX adresu i dodaj do grafu</button>
+              </div>
+            </div>
+            <div class="hint">Wywołania są bezpośrednio z przeglądarki na `https://blockchain.info/...&cors=true` (bez backendu).</div>
+          </div>
         </div>
 
         <div class="tab-pane" id="tab-edit">
@@ -1103,6 +1131,12 @@
         btcJsonInput: document.getElementById("btcJsonInput"),
         btcJsonFile: document.getElementById("btcJsonFile"),
         btnImportBtcJson: document.getElementById("btnImportBtcJson"),
+        apiTxHash: document.getElementById("apiTxHash"),
+        btnFetchTxApi: document.getElementById("btnFetchTxApi"),
+        apiAddress: document.getElementById("apiAddress"),
+        apiAddrLimit: document.getElementById("apiAddrLimit"),
+        apiAddrOffset: document.getElementById("apiAddrOffset"),
+        btnFetchAddrApi: document.getElementById("btnFetchAddrApi"),
 
         btnDeleteSelected: document.getElementById("btnDeleteSelected"),
         clusterName: document.getElementById("clusterName"),
@@ -1437,6 +1471,7 @@
         const locked = !!state.uiState.evidenceMode;
         const mutationButtons = [
           els.btnAddNode, els.btnAddTransfer, els.btnAddBtcTx, els.btnImportBtcJson, els.btcJsonFile,
+          els.btnFetchTxApi, els.btnFetchAddrApi,
           els.btnDeleteSelected, els.btnDeleteSelection, els.btnCreateCluster, els.btnClusterFromInputs,
           els.btnCollapse, els.btnExpand, els.btnEnableEdgeDraw, els.btnDisableEdgeDraw, els.btnUndo,
           els.btnRedo, els.btnApplySelection, els.btnLoad, els.btnLoadProject
@@ -1755,6 +1790,8 @@
         els.btnAddBtcTx.addEventListener("click", addBtcTxFromForm);
         els.btnImportBtcJson.addEventListener("click", importBtcJsonFromTextarea);
         els.btcJsonFile.addEventListener("change", importBtcJsonFromFile);
+        els.btnFetchTxApi.addEventListener("click", fetchTxFromBlockchainApi);
+        els.btnFetchAddrApi.addEventListener("click", fetchAddressTxsFromBlockchainApi);
         els.btnDeleteSelected.addEventListener("click", deleteSelectedWithHistory);
         els.btnDeleteSelection.addEventListener("click", deleteSelectedWithHistory);
         els.btnCreateCluster.addEventListener("click", createClusterFromSelection);
@@ -2113,7 +2150,7 @@
         return list;
       }
 
-      function addBtcUtxoTransaction(payload) {
+      function addBtcUtxoTransaction(payload, options = {}) {
         const txid = String(payload.txid || "").trim();
         const timestamp = payload.timestamp || null;
         const fees = parseNum(payload.fees, null);
@@ -2200,9 +2237,11 @@
           });
         });
 
-        focusAndSelect(cy.collection(createdElements));
+        const createdCollection = cy.collection(createdElements);
+        if (options.focus !== false) focusAndSelect(createdCollection);
         ensureEdgesVisibleAfterMutation(createdElements, "ADD_BTC_UTXO_TX");
-        showSuccess("Dodano transakcję BTC UTXO.");
+        if (!options.silent) showSuccess("Dodano transakcję BTC UTXO.");
+        return { txid, created: createdCollection };
       }
 
       function addBtcTxFromForm() {
@@ -2280,6 +2319,194 @@
           inputs,
           outputs
         };
+      }
+
+      function parseRawtxApiTxObject(obj) {
+        assert(obj && typeof obj === "object", "Niepoprawna odpowiedź API rawtx.");
+        const txid = String(obj.hash || obj.txid || "").trim();
+        assert(isValidTxid("BTC", txid), "API rawtx zwróciło niepoprawny tx hash.");
+
+        const rawInputs = Array.isArray(obj.inputs) ? obj.inputs : [];
+        const rawOutputs = Array.isArray(obj.out) ? obj.out : (Array.isArray(obj.outputs) ? obj.outputs : []);
+
+        const inputAddressSet = new Set();
+        const inputs = [];
+        rawInputs.forEach((input, idx) => {
+          const prevOut = input && typeof input === "object" ? input.prev_out : null;
+          const address = String((prevOut && (prevOut.addr || prevOut.address)) || input.address || "").trim();
+          const valueSats = prevOut && prevOut.value !== undefined ? prevOut.value : input.value;
+          const amount = satsToBtc(valueSats);
+          if (isValidAddress("BTC", address) && amount !== null && amount >= 0) {
+            inputs.push({ address, amount });
+            inputAddressSet.add(address);
+          } else if (!(input && input.coinbase)) {
+            void idx;
+          }
+        });
+        assert(inputs.length > 0, "Nie znaleziono poprawnych input address w odpowiedzi API rawtx.");
+
+        const outputs = [];
+        rawOutputs.forEach((output) => {
+          const address = String(output.addr || output.address || "").trim();
+          const amount = satsToBtc(output.value);
+          if (isValidAddress("BTC", address) && amount !== null && amount >= 0) {
+            outputs.push({ address, amount, isChange: inputAddressSet.has(address) });
+          }
+        });
+        assert(outputs.length > 0, "Nie znaleziono poprawnych output address w odpowiedzi API rawtx.");
+
+        const ts = Number(obj.time);
+        const timestamp = Number.isFinite(ts) && ts > 0 ? new Date(ts * 1000).toISOString() : null;
+
+        let fees = satsToBtc(obj.fee);
+        if (fees === null) {
+          const sumIn = inputs.reduce((acc, x) => acc + x.amount, 0);
+          const sumOut = outputs.reduce((acc, x) => acc + x.amount, 0);
+          const calcFee = Number((sumIn - sumOut).toFixed(8));
+          fees = calcFee >= 0 ? calcFee : null;
+        }
+
+        const noteParts = [
+          "Import blockchain.info/rawtx",
+          Number.isFinite(obj.block_height) ? `height=${obj.block_height}` : "",
+          Number.isFinite(obj.size) ? `size=${obj.size}` : ""
+        ].filter(Boolean);
+
+        return {
+          txid,
+          timestamp,
+          fees,
+          confidence: 0.9,
+          note: noteParts.join(", "),
+          sourceId: "blockchain.info-api",
+          tags: ["btc", "utxo", "import:blockchain.info-api"],
+          inputs,
+          outputs
+        };
+      }
+
+      function buildBlockchainApiUrl(path, params = {}) {
+        const url = new URL(`https://blockchain.info${path}`);
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, String(v));
+        });
+        url.searchParams.set("cors", "true");
+        return url.toString();
+      }
+
+      async function fetchBlockchainJson(path, params = {}) {
+        const url = buildBlockchainApiUrl(path, params);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        try {
+          const res = await fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            signal: controller.signal
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status} dla ${path}`);
+          const data = await res.json();
+          return { data, url };
+        } catch (err) {
+          if (err && err.name === "AbortError") throw new Error(`Timeout zapytania API (${path}).`);
+          throw err;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      function importBtcPayloadBatch(payloads, eventAction) {
+        let imported = 0;
+        let skipped = 0;
+        let failed = 0;
+        const failMessages = [];
+        let createdAll = cy.collection();
+
+        payloads.forEach((payload) => {
+          try {
+            const result = addBtcUtxoTransaction(payload, { silent: true, focus: false });
+            imported += 1;
+            createdAll = createdAll.add(result.created);
+          } catch (err) {
+            const msg = String(err && err.message ? err.message : err);
+            if (msg.includes("już istnieje")) {
+              skipped += 1;
+            } else {
+              failed += 1;
+              if (failMessages.length < 5) failMessages.push(`${payload.txid || "?"}: ${msg}`);
+            }
+          }
+        });
+
+        if (imported > 0) {
+          focusAndSelect(createdAll);
+          ensureEdgesVisibleAfterMutation(createdAll, eventAction);
+        }
+
+        appendEvent(eventAction, "import", "batch", null, { imported, skipped, failed });
+        if (imported > 0 && failed === 0) {
+          showSuccess(`Import zakończony: dodano ${imported}, pominięto ${skipped}.`);
+        } else if (imported > 0) {
+          showInfo(`Import częściowy: dodano ${imported}, pominięto ${skipped}, błędy ${failed}.`);
+        } else {
+          showError(`Import nieudany. Błędy: ${failed}, pominięto: ${skipped}.`);
+        }
+        if (failMessages.length) showInfo(`Szczegóły: ${failMessages.join(" | ")}`);
+      }
+
+      async function fetchTxFromBlockchainApi() {
+        if (mutationBlocked("FETCH_API_RAWTX")) return;
+        const txHash = (els.apiTxHash.value || "").trim();
+        try {
+          assert(isValidTxid("BTC", txHash), "Podaj poprawny BTC tx hash.");
+          els.btnFetchTxApi.disabled = true;
+          const { data, url } = await fetchBlockchainJson(`/rawtx/${txHash}`);
+          const payload = parseRawtxApiTxObject(data);
+          addBtcUtxoTransaction(payload);
+          appendEvent("FETCH_API_RAWTX", "import", payload.txid, null, { url });
+          showSuccess("Pobrano TX z API i dodano do grafu.");
+        } catch (err) {
+          showError(`API rawtx: ${err.message}`);
+        } finally {
+          els.btnFetchTxApi.disabled = false;
+        }
+      }
+
+      async function fetchAddressTxsFromBlockchainApi() {
+        if (mutationBlocked("FETCH_API_RAWADDR")) return;
+        const address = (els.apiAddress.value || "").trim();
+        const limit = Math.max(1, Math.min(50, parseInt(els.apiAddrLimit.value || "20", 10)));
+        const offset = Math.max(0, parseInt(els.apiAddrOffset.value || "0", 10) || 0);
+        try {
+          assert(isValidAddress("BTC", address), "Podaj poprawny adres BTC.");
+          els.btnFetchAddrApi.disabled = true;
+          const { data, url } = await fetchBlockchainJson(`/rawaddr/${encodeURIComponent(address)}`, { limit, offset });
+          const txs = Array.isArray(data.txs) ? data.txs : [];
+          assert(txs.length > 0, "API rawaddr nie zwróciło transakcji dla podanego zakresu.");
+          const payloads = [];
+          let parseSkipped = 0;
+          txs.forEach((tx) => {
+            try {
+              payloads.push(parseRawtxApiTxObject(tx));
+            } catch (_err) {
+              parseSkipped += 1;
+            }
+          });
+          assert(payloads.length > 0, "Nie udało się zmapować żadnej transakcji z odpowiedzi rawaddr.");
+          importBtcPayloadBatch(payloads, "FETCH_API_RAWADDR");
+          appendEvent("FETCH_API_RAWADDR", "import", address, null, {
+            url,
+            txCount: payloads.length,
+            parseSkipped,
+            limit,
+            offset
+          });
+          if (parseSkipped > 0) showInfo(`Pominięto ${parseSkipped} transakcji rawaddr (brak mapowania adresów input/output).`);
+        } catch (err) {
+          showError(`API rawaddr: ${err.message}`);
+        } finally {
+          els.btnFetchAddrApi.disabled = false;
+        }
       }
 
       function importBtcJsonFromTextarea() {
