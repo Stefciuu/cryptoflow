@@ -582,7 +582,7 @@
           </div>
 
           <div class="card">
-            <h3>Dodaj transakcję BTC (UTXO)</h3>
+            <h3>Dodaj transakcję BTC (UTXO, widok direct)</h3>
             <div class="row">
               <div>
                 <label>TXID</label>
@@ -609,7 +609,7 @@
             <textarea id="btcOutputs" placeholder="bc1q...,1.50,false&#10;bc1p...,0.069,true"></textarea>
             <label>Notatka</label>
             <textarea id="btcNote" placeholder="Opis transakcji UTXO"></textarea>
-            <button id="btnAddBtcTx" class="primary">Dodaj TX UTXO</button>
+            <button id="btnAddBtcTx" class="primary">Dodaj TX UTXO (Address -&gt; Address)</button>
           </div>
 
           <div class="card">
@@ -625,7 +625,7 @@
                 <input id="btcJsonFile" type="file" accept="application/json,.json" />
               </div>
             </div>
-            <div class="hint">Import mapuje dane do modelu BTC UTXO: Address -&gt; Tx -&gt; Address. Kwoty satoshi są konwertowane na BTC.</div>
+            <div class="hint">Import mapuje dane do modelu BTC UTXO direct: Address -&gt; Address. Kwoty satoshi są konwertowane na BTC.</div>
           </div>
         </div>
 
@@ -651,7 +651,7 @@
 
           <div class="card">
             <h3>Sugestie BTC (heurystyka)</h3>
-            <button id="btnClusterFromInputs">Utwórz klaster z inputów wybranego TX</button>
+            <button id="btnClusterFromInputs">Utwórz klaster z inputów (TX lub krawędź utxo-direct)</button>
             <div class="warning">
               Heurystyka common-input ownership i detekcja change output to wyłącznie sugestie analityczne.
               Nie traktuj jako dowód bez niezależnej weryfikacji.
@@ -1402,6 +1402,30 @@
         cy.fit(coll, 120);
       }
 
+      function ensureEdgesVisibleAfterMutation(elements, reason) {
+        if (!elements) return;
+        let coll = cy.collection();
+        if (Array.isArray(elements)) {
+          elements.forEach((el) => { if (el) coll = coll.add(el); });
+        } else {
+          coll = coll.add(elements);
+        }
+        const edges = coll.filter((e) => e && e.isEdge && e.isEdge() && !e.hasClass("synthetic"));
+        if (!edges.length) return;
+        const hiddenAll = edges.every((e) => !e.visible());
+        if (!hiddenAll) return;
+
+        state.uiState.filters = defaultFilters();
+        writeFiltersToUi();
+        state.uiState.timeline.from = state.uiState.timeline.min;
+        state.uiState.timeline.to = state.uiState.timeline.max;
+        writeTimelineUi();
+        applyAllFilters();
+        focusAndSelect(coll);
+        appendEvent("AUTO_RESET_VISIBILITY_FILTERS", "ui", "filters", null, { reason });
+        showInfo("Przepływy były ukryte przez filtry lub timeline. Filtry zostały zresetowane.");
+      }
+
       function mutationBlocked(actionName) {
         if (!state.uiState.evidenceMode) return false;
         appendEvent("MUTATION_BLOCKED", "policy", actionName, null, { evidenceMode: true });
@@ -1560,10 +1584,14 @@
             {
               selector: "edge",
               style: {
-                width: 2,
+                width: 2.4,
                 "line-color": "#94a3b8",
+                "line-outline-color": "#ffffff",
+                "line-outline-width": 0.8,
                 "target-arrow-color": "#94a3b8",
                 "target-arrow-shape": "triangle",
+                "target-arrow-fill": "filled",
+                "arrow-scale": 1.4,
                 "curve-style": "bezier",
                 label: "data(displayLabel)",
                 "font-size": 9,
@@ -1600,7 +1628,7 @@
               selector: "edge.synthetic",
               style: {
                 "line-style": "dashed",
-                width: 1.6,
+                width: 1.8,
                 "target-arrow-shape": "triangle"
               }
             },
@@ -1672,7 +1700,9 @@
                 edgeData.displayLabel = buildEdgeLabel(edgeData);
                 cy.add({ group: "edges", data: edgeData });
                 appendEvent("ADD_EDGE", "edge", edgeData.id, null, edgeData);
-                focusAndSelect(cy.collection([source, target, cy.getElementById(edgeData.id)]));
+                const created = cy.collection([source, target, cy.getElementById(edgeData.id)]);
+                focusAndSelect(created);
+                ensureEdgesVisibleAfterMutation(created, "ADD_EDGE_MANUAL");
               });
               showSuccess("Dodano manual-link.");
             }
@@ -1898,6 +1928,10 @@
         return cy.nodes().filter((n) => n.data("type") === "Tx" && n.data("chain") === chain && n.data("txid") === txid).first();
       }
 
+      function findBtcDirectEdgesByTxid(txid) {
+        return cy.edges().filter((e) => e.data("chain") === "BTC" && e.data("type") === "utxo-direct" && e.data("txid") === txid);
+      }
+
       function findDuplicateTransfer(chain, sourceId, targetId, asset, amount, txid, timestamp) {
         return cy.edges().filter((e) => {
           const d = e.data();
@@ -2047,7 +2081,9 @@
             cy.add({ group: "edges", data: edgeData });
             appendEvent("ADD_TRANSFER", "edge", edgeData.id, null, safeClone(edgeData));
             clearTransferForm();
-            focusAndSelect(cy.collection([fromNode, toNode, cy.getElementById(edgeData.id)]));
+            const created = cy.collection([fromNode, toNode, cy.getElementById(edgeData.id)]);
+            focusAndSelect(created);
+            ensureEdgesVisibleAfterMutation(created, "ADD_TRANSFER");
           });
           showSuccess("Dodano transfer.");
         } catch (err) {
@@ -2105,96 +2141,67 @@
           focusAndSelect(existingTx);
           throw new Error("Transakcja BTC o tym txid już istnieje.");
         }
+        const existingDirect = findBtcDirectEdgesByTxid(txid);
+        if (existingDirect && existingDirect.length) {
+          focusAndSelect(existingDirect);
+          throw new Error("Przepływ BTC o tym txid już istnieje.");
+        }
 
-        let txNodeData = null;
         const createdElements = [];
         withHistory("Dodanie BTC UTXO TX", "node", txid, () => {
-          txNodeData = {
-            id: makeId("tx"),
-            type: "Tx",
-            chain: "BTC",
-            label: `BTC TX ${shortTx(txid)}`,
-            address: "",
-            txid,
-            tags: baseTags,
-            note,
-            confidence,
-            externalId: "",
-            createdAt: nowIso(),
-            updatedAt: nowIso(),
-            sourceId,
-            fees,
-            timestamp
-          };
-          cy.add({ group: "nodes", data: txNodeData });
-          createdElements.push(cy.getElementById(txNodeData.id));
-
-          inputs.forEach((input, idx) => {
-            const sourceNode = getOrCreateAddressNode(input.address, "BTC");
-            const edgeData = {
-              id: makeId("e"),
-              type: "utxo-input",
-              source: sourceNode.id(),
-              target: txNodeData.id,
-              chain: "BTC",
-              asset: "BTC",
-              amount: input.amount,
-              txid,
-              timestamp,
-              fee: null,
-              direction: "in",
-              tags: ["utxo", "input"],
-              note: `Input #${idx + 1}`,
-              confidence,
-              sourceId,
-              createdAt: nowIso(),
-              updatedAt: nowIso()
-            };
-            edgeData.displayLabel = buildEdgeLabel(edgeData);
-            cy.add({ group: "edges", data: edgeData });
-            createdElements.push(cy.getElementById(edgeData.id));
-            createdElements.push(sourceNode);
+          const sourceNodes = inputs.map((input) => getOrCreateAddressNode(input.address, "BTC"));
+          const uniqSourceIds = new Set();
+          sourceNodes.forEach((n) => {
+            if (!uniqSourceIds.has(n.id())) {
+              uniqSourceIds.add(n.id());
+              createdElements.push(n);
+            }
           });
 
           outputs.forEach((output, idx) => {
             const targetNode = getOrCreateAddressNode(output.address, "BTC");
-            const edgeData = {
-              id: makeId("e"),
-              type: "utxo-output",
-              source: txNodeData.id,
-              target: targetNode.id(),
-              chain: "BTC",
-              asset: "BTC",
-              amount: output.amount,
-              txid,
-              timestamp,
-              fee: null,
-              direction: "out",
-              tags: output.isChange ? ["utxo", "output", "change-suspect"] : ["utxo", "output"],
-              note: `Output #${idx + 1}${output.isChange ? " (change?)" : ""}`,
-              confidence,
-              sourceId,
-              createdAt: nowIso(),
-              updatedAt: nowIso(),
-              isChange: !!output.isChange
-            };
-            edgeData.displayLabel = buildEdgeLabel(edgeData);
-            cy.add({ group: "edges", data: edgeData });
-            createdElements.push(cy.getElementById(edgeData.id));
-            createdElements.push(targetNode);
+            if (!createdElements.some((el) => el.id && el.id() === targetNode.id())) createdElements.push(targetNode);
+            const perInputAmount = sourceNodes.length > 0 ? Number((output.amount / sourceNodes.length).toFixed(8)) : output.amount;
+            sourceNodes.forEach((sourceNode, inIdx) => {
+              const edgeData = {
+                id: makeId("e"),
+                type: "utxo-direct",
+                source: sourceNode.id(),
+                target: targetNode.id(),
+                chain: "BTC",
+                asset: "BTC",
+                amount: perInputAmount,
+                txid,
+                timestamp,
+                fee: inIdx === 0 && idx === 0 ? fees : null,
+                direction: "out",
+                tags: output.isChange ? ["utxo", "direct", "change-suspect"] : ["utxo", "direct"],
+                note: `UTXO direct: output #${idx + 1}${output.isChange ? " (change?)" : ""}${note ? ` | ${note}` : ""}`,
+                confidence,
+                sourceId,
+                createdAt: nowIso(),
+                updatedAt: nowIso(),
+                isChange: !!output.isChange
+              };
+              edgeData.displayLabel = buildEdgeLabel(edgeData);
+              cy.add({ group: "edges", data: edgeData });
+              createdElements.push(cy.getElementById(edgeData.id));
+            });
           });
 
-          appendEvent("ADD_BTC_TX", "node", txNodeData.id, null, {
+          appendEvent("ADD_BTC_TX", "edge", txid, null, {
             txid,
             inputs,
             outputs,
             fees,
             timestamp,
-            sourceId
+            sourceId,
+            model: "utxo-direct-address"
           });
         });
 
         focusAndSelect(cy.collection(createdElements));
+        ensureEdgesVisibleAfterMutation(createdElements, "ADD_BTC_UTXO_TX");
         showSuccess("Dodano transakcję BTC UTXO.");
       }
 
@@ -2360,11 +2367,26 @@
         if (mutationBlocked("SUGGEST_CLUSTER_COMMON_INPUT")) return;
         try {
           const selectedTx = cy.nodes(":selected").filter((n) => n.data("type") === "Tx" && n.data("chain") === "BTC").first();
-          assert(selectedTx.length > 0, "Wybierz jeden węzeł TX (BTC), aby użyć heurystyki common-input.");
-          const inputAddrs = selectedTx.incomers("edge[type = 'utxo-input']").sources().filter((n) => n.data("type") === "Address");
-          assert(inputAddrs.length >= 2, "TX musi mieć co najmniej 2 inputy adresowe.");
+          let txid = "";
+          let inputAddrs = cy.collection();
 
-          const suggestedName = `SUGESTIA: common-input ${shortTx(selectedTx.data("txid") || selectedTx.id())}`;
+          if (selectedTx.length > 0) {
+            txid = selectedTx.data("txid") || selectedTx.id();
+            inputAddrs = selectedTx.incomers("edge[type = 'utxo-input']").sources().filter((n) => n.data("type") === "Address");
+          } else {
+            const selectedEdge = cy.edges(":selected").filter((e) => e.data("chain") === "BTC" && e.data("type") === "utxo-direct").first();
+            assert(selectedEdge.length > 0, "Wybierz węzeł TX BTC albo krawędź utxo-direct, aby użyć heurystyki common-input.");
+            txid = selectedEdge.data("txid") || "";
+            assert(txid, "Wybrana krawędź nie ma txid.");
+            const srcIds = new Set();
+            findBtcDirectEdgesByTxid(txid).forEach((edge) => srcIds.add(edge.data("source")));
+            const items = [...srcIds].map((id) => cy.getElementById(id)).filter((n) => n && n.length && n.data("type") === "Address");
+            inputAddrs = cy.collection(items);
+          }
+
+          assert(inputAddrs.length >= 2, "Transakcja musi mieć co najmniej 2 adresy wejściowe do sugestii.");
+
+          const suggestedName = `SUGESTIA: common-input ${shortTx(txid)}`;
           const clusterId = makeId("cluster");
 
           withHistory("Utworzenie klastra z inputów TX", "node", clusterId, () => {
@@ -2374,7 +2396,7 @@
               chain: "BTC",
               label: suggestedName,
               address: "",
-              txid: selectedTx.data("txid") || "",
+              txid,
               tags: ["suggested", "btc-common-input"],
               note: "Sugestia heurystyczna. Wymaga niezależnej weryfikacji.",
               confidence: 0.55,
@@ -2386,7 +2408,7 @@
             cy.add({ group: "nodes", data: clusterData });
             inputAddrs.forEach((n) => n.move({ parent: clusterId }));
             appendEvent("SUGGEST_CLUSTER_COMMON_INPUT", "node", clusterId, null, {
-              txid: selectedTx.data("txid") || selectedTx.id(),
+              txid,
               memberAddresses: inputAddrs.map((n) => n.data("address"))
             });
             if (expandCollapseApi) expandCollapseApi.collapse(cy.getElementById(clusterId));

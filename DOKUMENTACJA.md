@@ -106,6 +106,7 @@ Opcjonalne:
 
 Przykładowe `type`:
 - `transfer` (account-based)
+- `utxo-direct` (BTC direct address->address)
 - `utxo-input`
 - `utxo-output`
 - `manual-link`
@@ -132,12 +133,10 @@ Zasada: log jest **append-only** podczas pracy użytkownika.
 ## 3. Teoria: UTXO vs account-based i mapowanie na graf
 
 ## 3.1 UTXO (BTC)
-Model UTXO reprezentujemy jako:
-- węzeł `Tx` (transakcja BTC),
-- krawędzie `utxo-input`: `Address -> Tx`,
-- krawędzie `utxo-output`: `Tx -> Address`.
+Model UTXO w aktualnym UI reprezentujemy domyślnie jako:
+- krawędzie `utxo-direct`: `Address -> Address` (agregacja z danych input/output danej transakcji).
 
-Dzięki temu widoczna jest struktura wejść/wyjść transakcji i zależności UTXO-flow.
+Węzeł `Tx` i pełny model `Address -> Tx -> Address` pozostają kompatybilne dla starszych projektów, ale nowe dodania/importy BTC używają domyślnie reprezentacji direct.
 
 ## 3.2 Account-based (ETH/TRON)
 Model account-based reprezentujemy jako:
@@ -165,6 +164,7 @@ Uwaga: to **widok przybliżony** do eksploracji i nie zastępuje pełnego modelu
 
 ## 4.2 Typy krawędzi
 - `transfer`: transfer account-based.
+- `utxo-direct`: przepływ BTC w reprezentacji bezpośredniej `Address -> Address`.
 - `utxo-input`, `utxo-output`: przepływy BTC względem węzła Tx.
 - `manual-link`: połączenie ręczne (hipoteza analityka).
 - `utxo-aggregated`: krawędź syntetyczna dla uproszczonego widoku BTC.
@@ -296,8 +296,8 @@ Aby odtworzyć historię:
 1. Sekcja `Dodaj transakcję BTC (UTXO)`.
 2. Podaj `txid`, `timestamp`, `fees`.
 3. Wpisz `INPUTS` i `OUTPUTS` po jednej pozycji na linię.
-4. Kliknij `Dodaj TX UTXO`.
-5. Aplikacja tworzy: `Address -> Tx -> Address`.
+4. Kliknij `Dodaj TX UTXO (Address -> Address)`.
+5. Aplikacja tworzy przepływy direct `Address -> Address` (agregacja dla danej transakcji).
 
 ## 8.4.1 Import transakcji BTC z blockchain.com JSON
 1. W zakładce `Dodaj` przejdź do sekcji `Import BTC TX z JSON (blockchain.com)`.
@@ -306,7 +306,7 @@ Aby odtworzyć historię:
 4. Aplikacja:
   - waliduje strukturę i pola krytyczne (`txid`, `inputs[]`, `outputs[]`, `time`, `fee`),
   - konwertuje satoshi -> BTC,
-  - mapuje dane do modelu UTXO (`Address -> Tx -> Address`),
+  - mapuje dane do modelu UTXO direct (`Address -> Address`),
   - oznacza source jako `blockchain.com-json`.
 
 ## 8.5 Tworzenie klastrów
@@ -315,8 +315,8 @@ Aby odtworzyć historię:
 3. Użyj `Collapse` lub `Expand`.
 
 ## 8.6 Sugestie klastrów BTC
-1. Wybierz pojedynczy węzeł `Tx` (BTC).
-2. Kliknij `Utwórz klaster z inputów wybranego TX`.
+1. Wybierz pojedynczy węzeł `Tx` (BTC) lub krawędź `utxo-direct`.
+2. Kliknij `Utwórz klaster z inputów (TX lub krawędź utxo-direct)`.
 3. Sprawdź i zweryfikuj sugestię przed użyciem w raporcie.
 
 ## 8.7 Tagowanie i notatki
@@ -365,7 +365,7 @@ Aby odtworzyć historię:
 - [ ] Łańcuch jest widoczny przez kolor/oznaczenie.
 
 ## 9.3 BTC UTXO
-- [ ] Dodanie BTC TX tworzy poprawnie: inputAddr -> tx -> outputAddr.
+- [ ] Dodanie BTC TX tworzy poprawnie przepływy direct: inputAddr -> outputAddr.
 - [ ] Widok uproszczony BTC działa i można wrócić do pełnego.
 - [ ] Import JSON blockchain.com poprawnie tworzy strukturę UTXO.
 
