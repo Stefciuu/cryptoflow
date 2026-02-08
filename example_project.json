@@ -1,0 +1,954 @@
+{
+  "version": "1.0.0",
+  "projectMeta": {
+    "caseId": "CASE-2026-001",
+    "analyst": "Analityk Demo",
+    "createdAt": "2026-02-08T09:30:00.000Z",
+    "updatedAt": "2026-02-08T09:45:00.000Z",
+    "notes": "Przykładowy projekt cross-chain: BTC + ETH + TRON"
+  },
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "id": "cluster_cex_1",
+          "type": "Cluster",
+          "chain": "ETH",
+          "label": "CEX Alfa",
+          "address": "",
+          "txid": "",
+          "tags": [
+            "cex",
+            "pośrednik"
+          ],
+          "note": "Klaster ręczny",
+          "confidence": 0.86,
+          "externalId": "CASE-2026-001-C1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 520,
+          "y": 260
+        }
+      },
+      {
+        "data": {
+          "id": "n_btc_a1",
+          "type": "Address",
+          "chain": "BTC",
+          "label": "bc1q7...9x8m2w",
+          "address": "bc1q7lnp2u4h9k49tqz4hyyp5m5vva7r2z9x8m2w5u",
+          "txid": "",
+          "tags": [
+            "suspect"
+          ],
+          "note": "Adres wejściowy 1",
+          "confidence": 0.9,
+          "externalId": "CASE-2026-001-N1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 120,
+          "y": 180
+        }
+      },
+      {
+        "data": {
+          "id": "n_btc_a2",
+          "type": "Address",
+          "chain": "BTC",
+          "label": "bc1q5...33dp0a",
+          "address": "bc1q5upx6l3s3w0jm0a8uqqm6n3r43v66n33dp0ae9",
+          "txid": "",
+          "tags": [
+            "suspect"
+          ],
+          "note": "Adres wejściowy 2",
+          "confidence": 0.88,
+          "externalId": "CASE-2026-001-N2",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 120,
+          "y": 320
+        }
+      },
+      {
+        "data": {
+          "id": "tx_btc_1",
+          "type": "Tx",
+          "chain": "BTC",
+          "label": "BTC TX 7c1f4e2a...b2c901",
+          "address": "",
+          "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+          "tags": [
+            "btc",
+            "utxo"
+          ],
+          "note": "Przykładowa transakcja UTXO",
+          "confidence": 0.92,
+          "externalId": "CASE-2026-001-TX1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual",
+          "fees": 0.00012,
+          "timestamp": "2026-02-08T08:20:00.000Z"
+        },
+        "position": {
+          "x": 300,
+          "y": 250
+        }
+      },
+      {
+        "data": {
+          "id": "n_btc_out1",
+          "type": "Address",
+          "chain": "BTC",
+          "label": "bc1q2...0x2f11",
+          "address": "bc1q2yms4s8f8f6n9u6v5wd9h8mlf6v5l00x2f11j4",
+          "txid": "",
+          "tags": [
+            "cex"
+          ],
+          "note": "Output do pośrednika",
+          "confidence": 0.82,
+          "externalId": "CASE-2026-001-N3",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 470,
+          "y": 180
+        }
+      },
+      {
+        "data": {
+          "id": "n_btc_change",
+          "type": "Address",
+          "chain": "BTC",
+          "label": "bc1q9...zzt00p",
+          "address": "bc1q9k6h7xk4m0xy9yk3v0j4mkkj0mnc6mzzzt00px",
+          "txid": "",
+          "tags": [
+            "change-suspect"
+          ],
+          "note": "Prawdopodobny change",
+          "confidence": 0.6,
+          "externalId": "CASE-2026-001-N4",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 470,
+          "y": 320
+        }
+      },
+      {
+        "data": {
+          "id": "n_eth_1",
+          "type": "Address",
+          "chain": "ETH",
+          "label": "0xA11...1234",
+          "address": "0xA111111111111111111111111111111111111234",
+          "txid": "",
+          "tags": [
+            "bridge"
+          ],
+          "note": "Adres ETH źródłowy",
+          "confidence": 0.78,
+          "externalId": "CASE-2026-001-N5",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 640,
+          "y": 150
+        }
+      },
+      {
+        "data": {
+          "id": "n_eth_2",
+          "type": "Address",
+          "chain": "ETH",
+          "label": "0xB22...9876",
+          "address": "0xB222222222222222222222222222222222229876",
+          "txid": "",
+          "tags": [
+            "cex"
+          ],
+          "note": "Adres ETH docelowy",
+          "confidence": 0.8,
+          "externalId": "CASE-2026-001-N6",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual",
+          "parent": "cluster_cex_1"
+        },
+        "position": {
+          "x": 760,
+          "y": 140
+        }
+      },
+      {
+        "data": {
+          "id": "n_tron_1",
+          "type": "Address",
+          "chain": "TRON",
+          "label": "TRX źródło",
+          "address": "TQf4P8n7m8J7sQ2xVb8Jw2qF2wA7R9x3D1",
+          "txid": "",
+          "tags": [
+            "swap"
+          ],
+          "note": "Adres TRON źródłowy",
+          "confidence": 0.76,
+          "externalId": "CASE-2026-001-N7",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 640,
+          "y": 360
+        }
+      },
+      {
+        "data": {
+          "id": "n_tron_2",
+          "type": "Address",
+          "chain": "TRON",
+          "label": "TRX cel",
+          "address": "TL4xD3kW8FQ2yVn2M8a9U3u9Jf6nA2v4k7",
+          "txid": "",
+          "tags": [
+            "cex"
+          ],
+          "note": "Adres TRON docelowy",
+          "confidence": 0.81,
+          "externalId": "CASE-2026-001-N8",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual",
+          "parent": "cluster_cex_1"
+        },
+        "position": {
+          "x": 760,
+          "y": 360
+        }
+      },
+      {
+        "data": {
+          "id": "n_entity_bridge",
+          "type": "Entity",
+          "chain": "ETH",
+          "label": "Bridge/CEX punkt pośredni",
+          "address": "",
+          "txid": "",
+          "tags": [
+            "bridge",
+            "pośrednik"
+          ],
+          "note": "Ręcznie dodany punkt pośredni",
+          "confidence": 0.7,
+          "externalId": "CASE-2026-001-E1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "sourceId": "manual"
+        },
+        "position": {
+          "x": 560,
+          "y": 250
+        }
+      }
+    ],
+    "edges": [
+      {
+        "data": {
+          "id": "e_btc_in_1",
+          "type": "utxo-input",
+          "source": "n_btc_a1",
+          "target": "tx_btc_1",
+          "chain": "BTC",
+          "asset": "BTC",
+          "amount": 0.62,
+          "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+          "timestamp": "2026-02-08T08:20:00.000Z",
+          "fee": null,
+          "direction": "in",
+          "tags": [
+            "utxo",
+            "input"
+          ],
+          "note": "Input #1",
+          "confidence": 0.92,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "BTC 0.62\n7c1f4e2a...b2c901"
+        }
+      },
+      {
+        "data": {
+          "id": "e_btc_in_2",
+          "type": "utxo-input",
+          "source": "n_btc_a2",
+          "target": "tx_btc_1",
+          "chain": "BTC",
+          "asset": "BTC",
+          "amount": 0.43,
+          "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+          "timestamp": "2026-02-08T08:20:00.000Z",
+          "fee": null,
+          "direction": "in",
+          "tags": [
+            "utxo",
+            "input"
+          ],
+          "note": "Input #2",
+          "confidence": 0.92,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "BTC 0.43\n7c1f4e2a...b2c901"
+        }
+      },
+      {
+        "data": {
+          "id": "e_btc_out_1",
+          "type": "utxo-output",
+          "source": "tx_btc_1",
+          "target": "n_btc_out1",
+          "chain": "BTC",
+          "asset": "BTC",
+          "amount": 0.95,
+          "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+          "timestamp": "2026-02-08T08:20:00.000Z",
+          "fee": null,
+          "direction": "out",
+          "tags": [
+            "utxo",
+            "output"
+          ],
+          "note": "Output #1",
+          "confidence": 0.92,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "BTC 0.95\n7c1f4e2a...b2c901"
+        }
+      },
+      {
+        "data": {
+          "id": "e_btc_out_2",
+          "type": "utxo-output",
+          "source": "tx_btc_1",
+          "target": "n_btc_change",
+          "chain": "BTC",
+          "asset": "BTC",
+          "amount": 0.09988,
+          "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+          "timestamp": "2026-02-08T08:20:00.000Z",
+          "fee": null,
+          "direction": "out",
+          "tags": [
+            "utxo",
+            "output",
+            "change-suspect"
+          ],
+          "note": "Output #2 (change?)",
+          "confidence": 0.62,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "BTC 0.09988\n7c1f4e2a...b2c901"
+        }
+      },
+      {
+        "data": {
+          "id": "e_eth_transfer_1",
+          "type": "transfer",
+          "source": "n_eth_1",
+          "target": "n_eth_2",
+          "chain": "ETH",
+          "asset": "USDT",
+          "amount": 2500,
+          "txid": "0x05f4a2b0d4f308f0461467f3d299f55f4b44fb0e1f11fedf69f57b5ce68d1234",
+          "timestamp": "2026-02-08T08:40:00.000Z",
+          "fee": 0.0042,
+          "direction": "out",
+          "tags": [
+            "token-transfer",
+            "bridge"
+          ],
+          "note": "Transfer tokenowy ETH",
+          "confidence": 0.84,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "USDT 2500\n0x05f4a2...8d1234"
+        }
+      },
+      {
+        "data": {
+          "id": "e_tron_transfer_1",
+          "type": "transfer",
+          "source": "n_tron_1",
+          "target": "n_tron_2",
+          "chain": "TRON",
+          "asset": "USDT",
+          "amount": 2450,
+          "txid": "9df8cb714ac1d43e5d55d9b34a2afbbd4f9a16f3f92d87f0f9f9b0f5c0a77811",
+          "timestamp": "2026-02-08T08:55:00.000Z",
+          "fee": 1.2,
+          "direction": "out",
+          "tags": [
+            "token-transfer",
+            "swap"
+          ],
+          "note": "Transfer tokenowy TRON",
+          "confidence": 0.83,
+          "sourceId": "manual",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "USDT 2450\n9df8cb71...a77811"
+        }
+      },
+      {
+        "data": {
+          "id": "e_manual_link_1",
+          "type": "manual-link",
+          "source": "n_btc_out1",
+          "target": "n_entity_bridge",
+          "chain": "BTC",
+          "asset": "BTC",
+          "amount": null,
+          "txid": "",
+          "timestamp": "2026-02-08T09:10:00.000Z",
+          "fee": null,
+          "direction": "manual",
+          "tags": [
+            "manual",
+            "cex"
+          ],
+          "note": "Powiązanie analityczne BTC -> punkt pośredni",
+          "confidence": 0.58,
+          "sourceId": "raport-1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "BTC ?\nmanual"
+        }
+      },
+      {
+        "data": {
+          "id": "e_manual_link_2",
+          "type": "manual-link",
+          "source": "n_entity_bridge",
+          "target": "n_eth_1",
+          "chain": "ETH",
+          "asset": "ETH",
+          "amount": null,
+          "txid": "",
+          "timestamp": "2026-02-08T09:11:00.000Z",
+          "fee": null,
+          "direction": "manual",
+          "tags": [
+            "manual",
+            "bridge"
+          ],
+          "note": "Powiązanie analityczne punkt pośredni -> ETH",
+          "confidence": 0.58,
+          "sourceId": "raport-1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "ETH ?\nmanual"
+        }
+      },
+      {
+        "data": {
+          "id": "e_manual_link_3",
+          "type": "manual-link",
+          "source": "n_entity_bridge",
+          "target": "n_tron_1",
+          "chain": "TRON",
+          "asset": "TRX",
+          "amount": null,
+          "txid": "",
+          "timestamp": "2026-02-08T09:12:00.000Z",
+          "fee": null,
+          "direction": "manual",
+          "tags": [
+            "manual",
+            "swap"
+          ],
+          "note": "Powiązanie analityczne punkt pośredni -> TRON",
+          "confidence": 0.58,
+          "sourceId": "raport-1",
+          "createdAt": "2026-02-08T09:30:00.000Z",
+          "updatedAt": "2026-02-08T09:45:00.000Z",
+          "displayLabel": "TRX ?\nmanual"
+        }
+      }
+    ]
+  },
+  "domain": {
+    "nodes": [
+      {
+        "id": "cluster_cex_1",
+        "type": "Cluster",
+        "chain": "ETH",
+        "label": "CEX Alfa",
+        "address": "",
+        "txid": "",
+        "tags": [
+          "cex",
+          "pośrednik"
+        ],
+        "note": "Klaster ręczny",
+        "confidence": 0.86,
+        "externalId": "CASE-2026-001-C1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_btc_a1",
+        "type": "Address",
+        "chain": "BTC",
+        "label": "bc1q7...9x8m2w",
+        "address": "bc1q7lnp2u4h9k49tqz4hyyp5m5vva7r2z9x8m2w5u",
+        "txid": "",
+        "tags": [
+          "suspect"
+        ],
+        "note": "Adres wejściowy 1",
+        "confidence": 0.9,
+        "externalId": "CASE-2026-001-N1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_btc_a2",
+        "type": "Address",
+        "chain": "BTC",
+        "label": "bc1q5...33dp0a",
+        "address": "bc1q5upx6l3s3w0jm0a8uqqm6n3r43v66n33dp0ae9",
+        "txid": "",
+        "tags": [
+          "suspect"
+        ],
+        "note": "Adres wejściowy 2",
+        "confidence": 0.88,
+        "externalId": "CASE-2026-001-N2",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "tx_btc_1",
+        "type": "Tx",
+        "chain": "BTC",
+        "label": "BTC TX 7c1f4e2a...b2c901",
+        "address": "",
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+        "tags": [
+          "btc",
+          "utxo"
+        ],
+        "note": "Przykładowa transakcja UTXO",
+        "confidence": 0.92,
+        "externalId": "CASE-2026-001-TX1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_btc_out1",
+        "type": "Address",
+        "chain": "BTC",
+        "label": "bc1q2...0x2f11",
+        "address": "bc1q2yms4s8f8f6n9u6v5wd9h8mlf6v5l00x2f11j4",
+        "txid": "",
+        "tags": [
+          "cex"
+        ],
+        "note": "Output do pośrednika",
+        "confidence": 0.82,
+        "externalId": "CASE-2026-001-N3",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_btc_change",
+        "type": "Address",
+        "chain": "BTC",
+        "label": "bc1q9...zzt00p",
+        "address": "bc1q9k6h7xk4m0xy9yk3v0j4mkkj0mnc6mzzzt00px",
+        "txid": "",
+        "tags": [
+          "change-suspect"
+        ],
+        "note": "Prawdopodobny change",
+        "confidence": 0.6,
+        "externalId": "CASE-2026-001-N4",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_eth_1",
+        "type": "Address",
+        "chain": "ETH",
+        "label": "0xA11...1234",
+        "address": "0xA111111111111111111111111111111111111234",
+        "txid": "",
+        "tags": [
+          "bridge"
+        ],
+        "note": "Adres ETH źródłowy",
+        "confidence": 0.78,
+        "externalId": "CASE-2026-001-N5",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_eth_2",
+        "type": "Address",
+        "chain": "ETH",
+        "label": "0xB22...9876",
+        "address": "0xB222222222222222222222222222222222229876",
+        "txid": "",
+        "tags": [
+          "cex"
+        ],
+        "note": "Adres ETH docelowy",
+        "confidence": 0.8,
+        "externalId": "CASE-2026-001-N6",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_tron_1",
+        "type": "Address",
+        "chain": "TRON",
+        "label": "TRX źródło",
+        "address": "TQf4P8n7m8J7sQ2xVb8Jw2qF2wA7R9x3D1",
+        "txid": "",
+        "tags": [
+          "swap"
+        ],
+        "note": "Adres TRON źródłowy",
+        "confidence": 0.76,
+        "externalId": "CASE-2026-001-N7",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_tron_2",
+        "type": "Address",
+        "chain": "TRON",
+        "label": "TRX cel",
+        "address": "TL4xD3kW8FQ2yVn2M8a9U3u9Jf6nA2v4k7",
+        "txid": "",
+        "tags": [
+          "cex"
+        ],
+        "note": "Adres TRON docelowy",
+        "confidence": 0.81,
+        "externalId": "CASE-2026-001-N8",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "n_entity_bridge",
+        "type": "Entity",
+        "chain": "ETH",
+        "label": "Bridge/CEX punkt pośredni",
+        "address": "",
+        "txid": "",
+        "tags": [
+          "bridge",
+          "pośrednik"
+        ],
+        "note": "Ręcznie dodany punkt pośredni",
+        "confidence": 0.7,
+        "externalId": "CASE-2026-001-E1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_btc_in_1",
+        "type": "utxo-input",
+        "chain": "BTC",
+        "asset": "BTC",
+        "amount": 0.62,
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+        "timestamp": "2026-02-08T08:20:00.000Z",
+        "fee": null,
+        "tags": [
+          "utxo",
+          "input"
+        ],
+        "note": "Input #1",
+        "confidence": 0.92,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_btc_in_2",
+        "type": "utxo-input",
+        "chain": "BTC",
+        "asset": "BTC",
+        "amount": 0.43,
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+        "timestamp": "2026-02-08T08:20:00.000Z",
+        "fee": null,
+        "tags": [
+          "utxo",
+          "input"
+        ],
+        "note": "Input #2",
+        "confidence": 0.92,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_btc_out_1",
+        "type": "utxo-output",
+        "chain": "BTC",
+        "asset": "BTC",
+        "amount": 0.95,
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+        "timestamp": "2026-02-08T08:20:00.000Z",
+        "fee": null,
+        "tags": [
+          "utxo",
+          "output"
+        ],
+        "note": "Output #1",
+        "confidence": 0.92,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_btc_out_2",
+        "type": "utxo-output",
+        "chain": "BTC",
+        "asset": "BTC",
+        "amount": 0.09988,
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901",
+        "timestamp": "2026-02-08T08:20:00.000Z",
+        "fee": null,
+        "tags": [
+          "utxo",
+          "output",
+          "change-suspect"
+        ],
+        "note": "Output #2 (change?)",
+        "confidence": 0.62,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_eth_transfer_1",
+        "type": "transfer",
+        "chain": "ETH",
+        "asset": "USDT",
+        "amount": 2500,
+        "txid": "0x05f4a2b0d4f308f0461467f3d299f55f4b44fb0e1f11fedf69f57b5ce68d1234",
+        "timestamp": "2026-02-08T08:40:00.000Z",
+        "fee": 0.0042,
+        "tags": [
+          "token-transfer",
+          "bridge"
+        ],
+        "note": "Transfer tokenowy ETH",
+        "confidence": 0.84,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_tron_transfer_1",
+        "type": "transfer",
+        "chain": "TRON",
+        "asset": "USDT",
+        "amount": 2450,
+        "txid": "9df8cb714ac1d43e5d55d9b34a2afbbd4f9a16f3f92d87f0f9f9b0f5c0a77811",
+        "timestamp": "2026-02-08T08:55:00.000Z",
+        "fee": 1.2,
+        "tags": [
+          "token-transfer",
+          "swap"
+        ],
+        "note": "Transfer tokenowy TRON",
+        "confidence": 0.83,
+        "sourceId": "manual",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_manual_link_1",
+        "type": "manual-link",
+        "chain": "BTC",
+        "asset": "BTC",
+        "amount": null,
+        "txid": "",
+        "timestamp": "2026-02-08T09:10:00.000Z",
+        "fee": null,
+        "tags": [
+          "manual",
+          "cex"
+        ],
+        "note": "Powiązanie analityczne BTC -> punkt pośredni",
+        "confidence": 0.58,
+        "sourceId": "raport-1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_manual_link_2",
+        "type": "manual-link",
+        "chain": "ETH",
+        "asset": "ETH",
+        "amount": null,
+        "txid": "",
+        "timestamp": "2026-02-08T09:11:00.000Z",
+        "fee": null,
+        "tags": [
+          "manual",
+          "bridge"
+        ],
+        "note": "Powiązanie analityczne punkt pośredni -> ETH",
+        "confidence": 0.58,
+        "sourceId": "raport-1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      },
+      {
+        "id": "e_manual_link_3",
+        "type": "manual-link",
+        "chain": "TRON",
+        "asset": "TRX",
+        "amount": null,
+        "txid": "",
+        "timestamp": "2026-02-08T09:12:00.000Z",
+        "fee": null,
+        "tags": [
+          "manual",
+          "swap"
+        ],
+        "note": "Powiązanie analityczne punkt pośredni -> TRON",
+        "confidence": 0.58,
+        "sourceId": "raport-1",
+        "createdAt": "2026-02-08T09:30:00.000Z",
+        "updatedAt": "2026-02-08T09:45:00.000Z"
+      }
+    ]
+  },
+  "eventLog": [
+    {
+      "ts": "2026-02-08T09:30:00.000Z",
+      "actor": "Analityk Demo",
+      "action": "INIT_PROJECT",
+      "targetType": "project",
+      "targetId": "new",
+      "before": null,
+      "after": {
+        "version": "1.0.0"
+      }
+    },
+    {
+      "ts": "2026-02-08T09:33:00.000Z",
+      "actor": "Analityk Demo",
+      "action": "ADD_BTC_TX",
+      "targetType": "node",
+      "targetId": "tx_btc_1",
+      "before": null,
+      "after": {
+        "txid": "7c1f4e2ac1fdfad0ef2d8d0e74f6d2f68ad66fe4ef7c9e9a08f00d6f2fb2c901"
+      }
+    },
+    {
+      "ts": "2026-02-08T09:36:00.000Z",
+      "actor": "Analityk Demo",
+      "action": "ADD_TRANSFER",
+      "targetType": "edge",
+      "targetId": "e_eth_transfer_1",
+      "before": null,
+      "after": {
+        "chain": "ETH",
+        "asset": "USDT",
+        "amount": 2500
+      }
+    },
+    {
+      "ts": "2026-02-08T09:39:00.000Z",
+      "actor": "Analityk Demo",
+      "action": "ADD_TRANSFER",
+      "targetType": "edge",
+      "targetId": "e_tron_transfer_1",
+      "before": null,
+      "after": {
+        "chain": "TRON",
+        "asset": "USDT",
+        "amount": 2450
+      }
+    },
+    {
+      "ts": "2026-02-08T09:42:00.000Z",
+      "actor": "Analityk Demo",
+      "action": "CREATE_CLUSTER",
+      "targetType": "node",
+      "targetId": "cluster_cex_1",
+      "before": null,
+      "after": {
+        "members": [
+          "n_eth_2",
+          "n_tron_2"
+        ]
+      }
+    }
+  ],
+  "uiState": {
+    "layout": "cose",
+    "filters": {
+      "chains": {
+        "BTC": true,
+        "ETH": true,
+        "TRON": true
+      },
+      "asset": "",
+      "amountMin": null,
+      "amountMax": null,
+      "tag": "",
+      "confidenceMin": 0,
+      "hideNoTimestamp": false,
+      "hideIsolated": false,
+      "text": ""
+    },
+    "timeline": {
+      "from": 1769943000000,
+      "to": 1769947200000,
+      "min": 1769943000000,
+      "max": 1769947200000,
+      "hideIsolated": false
+    },
+    "btcSimpleView": false
+  },
+  "evidence": {
+    "projectSha256": "",
+    "pngSha256": "",
+    "packageSha256": ""
+  }
+}

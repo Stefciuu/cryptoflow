@@ -1,0 +1,2763 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto Flow Graph Builder (MVP)</title>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-edgehandles@4.0.1/cytoscape-edgehandles.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-undo-redo@1.3.3/cytoscape-undo-redo.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-expand-collapse@4.1.1/cytoscape-expand-collapse.js"></script>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --text: #1f2430;
+      --muted: #5b6475;
+      --line: #d6dae3;
+      --accent: #1e3a8a;
+      --accent-2: #0ea5e9;
+      --danger: #b91c1c;
+      --btc: #f7931a;
+      --eth: #627eea;
+      --tron: #ef0027;
+      --cluster: #334155;
+      --tx: #111827;
+      --entity: #7c3aed;
+      --address: #0f766e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(160deg, #eef2ff 0%, #f8fafc 45%, #ecfeff 100%);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffffee;
+      backdrop-filter: blur(6px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .topbar .title {
+      font-weight: 700;
+      font-size: 15px;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .topbar input[type="text"] {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 330px 1fr 360px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .panel.right {
+      border-left: 1px solid var(--line);
+      border-right: none;
+    }
+
+    .cy-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      background:
+        radial-gradient(circle at 10% 10%, #dbeafe 0%, transparent 30%),
+        radial-gradient(circle at 90% 20%, #cffafe 0%, transparent 28%),
+        radial-gradient(circle at 20% 90%, #e2e8f0 0%, transparent 35%),
+        #f8fafc;
+    }
+
+    #cy {
+      width: 100%;
+      height: 100%;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      background: #ffffff;
+      z-index: 5;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      border-color: var(--accent);
+      background: #e0e7ff;
+      color: #1e1b4b;
+      font-weight: 700;
+    }
+
+    .tab-pane {
+      display: none;
+      padding: 10px;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0.1px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    label {
+      display: block;
+      margin: 4px 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 58px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #f8fafc;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    button.danger {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: var(--danger);
+    }
+
+    button.ghost {
+      background: #fff;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .inline {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      margin-right: 4px;
+      margin-top: 4px;
+      background: #f8fafc;
+    }
+
+    .badge.btc {
+      border-color: #fed7aa;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .badge.eth {
+      border-color: #c7d2fe;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .badge.tron {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .badge.warn {
+      border-color: #fde68a;
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .log {
+      max-height: 250px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px;
+      font-size: 11px;
+    }
+
+    .log-item {
+      border-bottom: 1px dashed #d1d5db;
+      padding: 6px 0;
+    }
+
+    .log-item:last-child {
+      border-bottom: none;
+    }
+
+    .selection-empty {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 10px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .warning {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 11px;
+      margin-top: 8px;
+      line-height: 1.35;
+    }
+
+    .kbd {
+      border: 1px solid #cbd5e1;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-size: 11px;
+      background: #f8fafc;
+      font-family: monospace;
+    }
+
+    .status {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .context-menu {
+      position: absolute;
+      z-index: 25;
+      display: none;
+      width: 170px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+      overflow: hidden;
+    }
+
+    .context-menu button {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid #eef2f7;
+      border-radius: 0;
+      text-align: left;
+      background: #fff;
+      padding: 9px;
+    }
+
+    .context-menu button:last-child {
+      border-bottom: none;
+    }
+
+    .context-menu button:hover {
+      background: #eff6ff;
+    }
+
+    @media (max-width: 1450px) {
+      .main {
+        grid-template-columns: 300px 1fr 320px;
+      }
+    }
+
+    @media (max-width: 1220px) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 55vh auto;
+      }
+      .panel,
+      .panel.right,
+      .cy-wrap {
+        border: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title">Crypto Flow Graph Builder (MVP)</div>
+      <input id="globalSearch" type="text" placeholder="Szukaj: adres / txid / tag / notatka" />
+      <button id="btnUndo" title="Ctrl+Z">Undo</button>
+      <button id="btnRedo" title="Ctrl+Y">Redo</button>
+      <button id="btnSave" class="primary">Zapisz</button>
+      <button id="btnLoad">Wczytaj</button>
+      <button id="btnExportPng">Export PNG</button>
+      <input id="fileLoader" type="file" accept="application/json" style="display:none" />
+    </div>
+
+    <div class="main">
+      <div class="panel left">
+        <div class="tabs" id="tabs">
+          <button class="tab-btn active" data-tab="tab-add">Dodaj</button>
+          <button class="tab-btn" data-tab="tab-edit">Edycja</button>
+          <button class="tab-btn" data-tab="tab-filters">Filtry</button>
+          <button class="tab-btn" data-tab="tab-timeline">Timeline</button>
+          <button class="tab-btn" data-tab="tab-project">Projekt/Eksport</button>
+          <button class="tab-btn" data-tab="tab-evidence">Dowody</button>
+        </div>
+
+        <div class="tab-pane active" id="tab-add">
+          <div class="card">
+            <h3>Dodaj węzeł</h3>
+            <div class="row">
+              <div>
+                <label>Typ</label>
+                <select id="nodeType">
+                  <option value="Address">Address</option>
+                  <option value="Tx">Tx</option>
+                  <option value="Entity">Entity</option>
+                  <option value="Cluster">Cluster</option>
+                </select>
+              </div>
+              <div>
+                <label>Chain</label>
+                <select id="nodeChain">
+                  <option value="BTC">BTC</option>
+                  <option value="ETH">ETH</option>
+                  <option value="TRON">TRON</option>
+                </select>
+              </div>
+            </div>
+            <label>Etykieta</label>
+            <input id="nodeLabel" type="text" placeholder="np. Portfel podejrzany A" />
+            <div class="row">
+              <div>
+                <label>Adres (opcjonalnie)</label>
+                <input id="nodeAddress" type="text" placeholder="BTC/ETH/TRON" />
+              </div>
+              <div>
+                <label>TXID (opcjonalnie)</label>
+                <input id="nodeTxid" type="text" placeholder="hash transakcji" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Tagi (CSV)</label>
+                <input id="nodeTags" type="text" placeholder="mixer,cex,wysokie-ryzyko" />
+              </div>
+              <div>
+                <label>Confidence (0..1)</label>
+                <input id="nodeConfidence" type="number" min="0" max="1" step="0.01" value="0.7" />
+              </div>
+            </div>
+            <label>External ID (opcjonalnie)</label>
+            <input id="nodeExternalId" type="text" placeholder="np. CASE-2026-001-N-17" />
+            <label>Notatka</label>
+            <textarea id="nodeNote" placeholder="Opis analityczny"></textarea>
+            <div class="inline">
+              <button id="btnAddNode" class="primary">Dodaj węzeł</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Dodaj transfer (account-based ETH/TRON/BTC-account)</h3>
+            <div class="row">
+              <div>
+                <label>From address</label>
+                <input id="trFrom" type="text" placeholder="adres źródłowy" />
+              </div>
+              <div>
+                <label>To address</label>
+                <input id="trTo" type="text" placeholder="adres docelowy" />
+              </div>
+            </div>
+            <div class="row-3">
+              <div>
+                <label>Chain</label>
+                <select id="trChain">
+                  <option value="ETH">ETH</option>
+                  <option value="TRON">TRON</option>
+                  <option value="BTC">BTC</option>
+                </select>
+              </div>
+              <div>
+                <label>Asset</label>
+                <input id="trAsset" type="text" value="USDT" />
+              </div>
+              <div>
+                <label>Amount</label>
+                <input id="trAmount" type="number" min="0" step="any" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>TXID</label>
+                <input id="trTxid" type="text" placeholder="hash tx" />
+              </div>
+              <div>
+                <label>Timestamp</label>
+                <input id="trTimestamp" type="datetime-local" />
+              </div>
+            </div>
+            <div class="row-3">
+              <div>
+                <label>Fee</label>
+                <input id="trFee" type="number" min="0" step="any" />
+              </div>
+              <div>
+                <label>Direction</label>
+                <select id="trDirection">
+                  <option value="out">out</option>
+                  <option value="in">in</option>
+                  <option value="internal">internal</option>
+                </select>
+              </div>
+              <div>
+                <label>Confidence (0..1)</label>
+                <input id="trConfidence" type="number" min="0" max="1" step="0.01" value="0.8" />
+              </div>
+            </div>
+            <label>Tagi (CSV)</label>
+            <input id="trTags" type="text" placeholder="token-transfer,manual" />
+            <label>Notatka</label>
+            <textarea id="trNote" placeholder="Dodatkowe informacje"></textarea>
+            <button id="btnAddTransfer" class="primary">Dodaj transfer</button>
+          </div>
+
+          <div class="card">
+            <h3>Dodaj transakcję BTC (UTXO)</h3>
+            <div class="row">
+              <div>
+                <label>TXID</label>
+                <input id="btcTxid" type="text" placeholder="64-hex" />
+              </div>
+              <div>
+                <label>Timestamp</label>
+                <input id="btcTimestamp" type="datetime-local" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Fees (BTC)</label>
+                <input id="btcFees" type="number" min="0" step="any" />
+              </div>
+              <div>
+                <label>Confidence (0..1)</label>
+                <input id="btcConfidence" type="number" min="0" max="1" step="0.01" value="0.85" />
+              </div>
+            </div>
+            <label>INPUTS (linia: address,amount)</label>
+            <textarea id="btcInputs" placeholder="bc1q...,0.42&#10;bc1p...,1.15"></textarea>
+            <label>OUTPUTS (linia: address,amount,isChange[opcjonalnie true/false])</label>
+            <textarea id="btcOutputs" placeholder="bc1q...,1.50,false&#10;bc1p...,0.069,true"></textarea>
+            <label>Notatka</label>
+            <textarea id="btcNote" placeholder="Opis transakcji UTXO"></textarea>
+            <button id="btnAddBtcTx" class="primary">Dodaj TX UTXO</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-edit">
+          <div class="card">
+            <h3>Operacje na zaznaczeniu</h3>
+            <button id="btnDeleteSelected" class="danger">Usuń zaznaczone</button>
+            <div class="hint">Wspierane undo/redo dla usunięć i przywróceń.</div>
+          </div>
+
+          <div class="card">
+            <h3>Klastrowanie manualne</h3>
+            <label>Nazwa klastra</label>
+            <input id="clusterName" type="text" placeholder="np. Klaster CEX Alfa" />
+            <label>Tagi klastra (CSV)</label>
+            <input id="clusterTags" type="text" placeholder="cex,pośrednik" />
+            <button id="btnCreateCluster" class="primary">Utwórz klaster z zaznaczonych węzłów</button>
+            <div class="inline" style="margin-top:8px">
+              <button id="btnCollapse" class="ghost">Collapse</button>
+              <button id="btnExpand" class="ghost">Expand</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Sugestie BTC (heurystyka)</h3>
+            <button id="btnClusterFromInputs">Utwórz klaster z inputów wybranego TX</button>
+            <div class="warning">
+              Heurystyka common-input ownership i detekcja change output to wyłącznie sugestie analityczne.
+              Nie traktuj jako dowód bez niezależnej weryfikacji.
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Tryb widoku BTC</h3>
+            <label class="inline" style="align-items:center">
+              <input id="toggleBtcSimple" type="checkbox" style="width:auto" />
+              Widok uproszczony (address -&gt; address, agregacja z TX UTXO)
+            </label>
+            <div class="hint">Włączony: ukrywa węzły TX BTC i pokazuje syntetyczne krawędzie przybliżone.</div>
+          </div>
+
+          <div class="card">
+            <h3>Rysowanie krawędzi myszą</h3>
+            <button id="btnEnableEdgeDraw">Włącz edgehandles</button>
+            <button id="btnDisableEdgeDraw">Wyłącz edgehandles</button>
+            <div class="hint">Nowe krawędzie rysowane ręcznie są oznaczane jako manual-link.</div>
+          </div>
+
+          <div class="card">
+            <h3>Skróty klawiszowe</h3>
+            <div class="hint"><span class="kbd">Ctrl+Z</span> undo, <span class="kbd">Ctrl+Y</span> redo, <span class="kbd">Delete</span> usuń zaznaczone.</div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-filters">
+          <div class="card">
+            <h3>Chain</h3>
+            <label class="inline"><input class="f-chain" type="checkbox" value="BTC" checked style="width:auto" /> BTC</label>
+            <label class="inline"><input class="f-chain" type="checkbox" value="ETH" checked style="width:auto" /> ETH</label>
+            <label class="inline"><input class="f-chain" type="checkbox" value="TRON" checked style="width:auto" /> TRON</label>
+          </div>
+
+          <div class="card">
+            <h3>Asset / Amount / Confidence</h3>
+            <label>Asset (substring)</label>
+            <input id="fAsset" type="text" placeholder="np. BTC, ETH, USDT" />
+            <div class="row">
+              <div>
+                <label>Amount min</label>
+                <input id="fAmountMin" type="number" min="0" step="any" />
+              </div>
+              <div>
+                <label>Amount max</label>
+                <input id="fAmountMax" type="number" min="0" step="any" />
+              </div>
+            </div>
+            <label>Confidence min</label>
+            <input id="fConfidenceMin" type="number" min="0" max="1" step="0.01" value="0" />
+          </div>
+
+          <div class="card">
+            <h3>Tag / Timestamp</h3>
+            <label>Tag filter (substring)</label>
+            <input id="fTag" type="text" placeholder="np. mixer" />
+            <label class="inline"><input id="fHideNoTs" type="checkbox" style="width:auto" /> Ukryj edge bez timestamp</label>
+            <label class="inline"><input id="fHideIsolated" type="checkbox" style="width:auto" /> Ukryj odizolowane węzły</label>
+            <button id="btnApplyFilters" class="primary">Zastosuj filtry</button>
+            <button id="btnResetFilters">Reset filtrów</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-timeline">
+          <div class="card">
+            <h3>Zakres czasu</h3>
+            <label>Od (suwak)</label>
+            <input id="timelineFromRange" type="range" min="0" max="100" value="0" />
+            <label>Do (suwak)</label>
+            <input id="timelineToRange" type="range" min="0" max="100" value="100" />
+            <div class="row">
+              <div>
+                <label>Od (ręcznie)</label>
+                <input id="timelineFromDate" type="datetime-local" />
+              </div>
+              <div>
+                <label>Do (ręcznie)</label>
+                <input id="timelineToDate" type="datetime-local" />
+              </div>
+            </div>
+            <button id="btnTimelineApply" class="primary">Zastosuj timeline</button>
+            <button id="btnTimelineReset">Reset timeline</button>
+            <div class="status">
+              <span id="timelineInfo"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-project">
+          <div class="card">
+            <h3>Projekt</h3>
+            <button id="btnSaveProject" class="primary">Zapisz projekt (JSON)</button>
+            <button id="btnLoadProject">Wczytaj projekt (JSON)</button>
+            <button id="btnLayout">Przelicz layout</button>
+            <button id="btnFit">Dopasuj widok</button>
+            <div class="hint">Wczytanie projektu waliduje wersję i schemat krytycznych pól.</div>
+          </div>
+
+          <div class="card">
+            <h3>Eksport</h3>
+            <label>Skala PNG</label>
+            <input id="pngScale" type="number" min="1" max="8" step="1" value="3" />
+            <label class="inline"><input id="pngWhiteBg" type="checkbox" checked style="width:auto" /> Białe tło</label>
+            <button id="btnExportPng2" class="primary">Eksportuj PNG aktualnego widoku</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-evidence">
+          <div class="card">
+            <h3>Metadane sprawy</h3>
+            <label>Case ID</label>
+            <input id="metaCaseId" type="text" placeholder="np. CASE-2026-001" />
+            <label>Analityk (actor)</label>
+            <input id="metaAnalyst" type="text" placeholder="Imię i nazwisko / identyfikator" />
+            <div class="row">
+              <div>
+                <label>Data rozpoczęcia</label>
+                <input id="metaCreatedAt" type="datetime-local" />
+              </div>
+              <div>
+                <label>Aktualizacja</label>
+                <input id="metaUpdatedAt" type="text" readonly />
+              </div>
+            </div>
+            <label>Opis / notatki sprawy</label>
+            <textarea id="metaNotes" placeholder="Kontekst sprawy"></textarea>
+            <button id="btnApplyMeta" class="primary">Zastosuj metadane</button>
+          </div>
+
+          <div class="card">
+            <h3>Hash dowodowy (SHA-256)</h3>
+            <label>Hash projektu JSON</label>
+            <input id="hashProject" type="text" readonly />
+            <label>Hash ostatniego PNG</label>
+            <input id="hashPng" type="text" readonly />
+            <label>Hash pakietu dowodowego</label>
+            <input id="hashPackage" type="text" readonly />
+            <button id="btnRehash">Przelicz hash</button>
+          </div>
+
+          <div class="card">
+            <h3>Event log (append-only)</h3>
+            <div id="eventLogView" class="log"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cy-wrap">
+        <div id="cy"></div>
+        <div id="contextMenu" class="context-menu">
+          <button id="ctxDelete">Usuń zaznaczone</button>
+          <button id="ctxFocus">Centruj na zaznaczeniu</button>
+          <button id="ctxClear">Odznacz wszystko</button>
+        </div>
+      </div>
+
+      <div class="panel right">
+        <div class="card">
+          <h3>Szczegóły zaznaczenia</h3>
+          <div id="selectionInfo" class="selection-empty">Brak zaznaczenia. Wybierz węzeł lub krawędź.</div>
+
+          <div id="selectionEditor" style="display:none">
+            <label>ID</label>
+            <input id="selId" type="text" readonly />
+            <div class="row">
+              <div>
+                <label>Typ</label>
+                <input id="selType" type="text" />
+              </div>
+              <div>
+                <label>Chain</label>
+                <select id="selChain">
+                  <option value="BTC">BTC</option>
+                  <option value="ETH">ETH</option>
+                  <option value="TRON">TRON</option>
+                </select>
+              </div>
+            </div>
+            <label>Etykieta / Asset</label>
+            <input id="selLabel" type="text" />
+            <div class="row">
+              <div>
+                <label>Adres / sourceId</label>
+                <input id="selAddress" type="text" />
+              </div>
+              <div>
+                <label>TXID</label>
+                <input id="selTxid" type="text" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Kwota</label>
+                <input id="selAmount" type="number" step="any" />
+              </div>
+              <div>
+                <label>Fee</label>
+                <input id="selFee" type="number" step="any" />
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Timestamp</label>
+                <input id="selTimestamp" type="datetime-local" />
+              </div>
+              <div>
+                <label>Confidence (0..1)</label>
+                <input id="selConfidence" type="number" min="0" max="1" step="0.01" />
+              </div>
+            </div>
+            <label>Tagi (CSV)</label>
+            <input id="selTags" type="text" />
+            <label>Źródło</label>
+            <input id="selSource" type="text" placeholder="np. explorer + numer raportu" />
+            <label>Notatka</label>
+            <textarea id="selNote"></textarea>
+            <div class="inline" style="margin-top:8px">
+              <button id="btnApplySelection" class="primary">Zastosuj zmiany</button>
+              <button id="btnDeleteSelection" class="danger">Usuń</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Legenda</h3>
+          <span class="badge btc">BTC</span>
+          <span class="badge eth">ETH</span>
+          <span class="badge tron">TRON</span>
+          <div class="hint">Kolor obramowania węzła i krawędzi oznacza chain. Kształt: Address=okrąg, Tx=romb, Entity=hexagon, Cluster=prostokąt.</div>
+        </div>
+
+        <div class="card">
+          <h3>Status</h3>
+          <div class="status">
+            <span id="statusCounts"></span>
+            <span id="statusSelection"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const APP_VERSION = "1.0.0";
+      const CHAIN_COLORS = {
+        BTC: "#f7931a",
+        ETH: "#627eea",
+        TRON: "#ef0027"
+      };
+
+      const state = {
+        meta: {
+          caseId: "",
+          analyst: "",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          notes: ""
+        },
+        eventLog: [],
+        hashes: {
+          projectSha256: "",
+          pngSha256: "",
+          packageSha256: ""
+        },
+        uiState: {
+          layout: "cose",
+          filters: defaultFilters(),
+          timeline: {
+            from: null,
+            to: null,
+            min: null,
+            max: null,
+            hideIsolated: false
+          },
+          btcSimpleView: false
+        },
+        undoStack: [],
+        redoStack: [],
+        historyLocked: false,
+        edgeDrawingEnabled: false,
+        loadedFromFile: false
+      };
+
+      let cy;
+      let edgehandles;
+      let expandCollapseApi;
+      let undoRedoPlugin;
+
+      const els = {
+        tabs: document.getElementById("tabs"),
+        globalSearch: document.getElementById("globalSearch"),
+        btnUndo: document.getElementById("btnUndo"),
+        btnRedo: document.getElementById("btnRedo"),
+        btnSave: document.getElementById("btnSave"),
+        btnLoad: document.getElementById("btnLoad"),
+        btnExportPng: document.getElementById("btnExportPng"),
+        fileLoader: document.getElementById("fileLoader"),
+
+        nodeType: document.getElementById("nodeType"),
+        nodeChain: document.getElementById("nodeChain"),
+        nodeLabel: document.getElementById("nodeLabel"),
+        nodeAddress: document.getElementById("nodeAddress"),
+        nodeTxid: document.getElementById("nodeTxid"),
+        nodeTags: document.getElementById("nodeTags"),
+        nodeConfidence: document.getElementById("nodeConfidence"),
+        nodeExternalId: document.getElementById("nodeExternalId"),
+        nodeNote: document.getElementById("nodeNote"),
+        btnAddNode: document.getElementById("btnAddNode"),
+
+        trFrom: document.getElementById("trFrom"),
+        trTo: document.getElementById("trTo"),
+        trChain: document.getElementById("trChain"),
+        trAsset: document.getElementById("trAsset"),
+        trAmount: document.getElementById("trAmount"),
+        trTxid: document.getElementById("trTxid"),
+        trTimestamp: document.getElementById("trTimestamp"),
+        trFee: document.getElementById("trFee"),
+        trDirection: document.getElementById("trDirection"),
+        trConfidence: document.getElementById("trConfidence"),
+        trTags: document.getElementById("trTags"),
+        trNote: document.getElementById("trNote"),
+        btnAddTransfer: document.getElementById("btnAddTransfer"),
+
+        btcTxid: document.getElementById("btcTxid"),
+        btcTimestamp: document.getElementById("btcTimestamp"),
+        btcFees: document.getElementById("btcFees"),
+        btcConfidence: document.getElementById("btcConfidence"),
+        btcInputs: document.getElementById("btcInputs"),
+        btcOutputs: document.getElementById("btcOutputs"),
+        btcNote: document.getElementById("btcNote"),
+        btnAddBtcTx: document.getElementById("btnAddBtcTx"),
+
+        btnDeleteSelected: document.getElementById("btnDeleteSelected"),
+        clusterName: document.getElementById("clusterName"),
+        clusterTags: document.getElementById("clusterTags"),
+        btnCreateCluster: document.getElementById("btnCreateCluster"),
+        btnClusterFromInputs: document.getElementById("btnClusterFromInputs"),
+        btnCollapse: document.getElementById("btnCollapse"),
+        btnExpand: document.getElementById("btnExpand"),
+        toggleBtcSimple: document.getElementById("toggleBtcSimple"),
+        btnEnableEdgeDraw: document.getElementById("btnEnableEdgeDraw"),
+        btnDisableEdgeDraw: document.getElementById("btnDisableEdgeDraw"),
+
+        fChains: document.querySelectorAll(".f-chain"),
+        fAsset: document.getElementById("fAsset"),
+        fAmountMin: document.getElementById("fAmountMin"),
+        fAmountMax: document.getElementById("fAmountMax"),
+        fConfidenceMin: document.getElementById("fConfidenceMin"),
+        fTag: document.getElementById("fTag"),
+        fHideNoTs: document.getElementById("fHideNoTs"),
+        fHideIsolated: document.getElementById("fHideIsolated"),
+        btnApplyFilters: document.getElementById("btnApplyFilters"),
+        btnResetFilters: document.getElementById("btnResetFilters"),
+
+        timelineFromRange: document.getElementById("timelineFromRange"),
+        timelineToRange: document.getElementById("timelineToRange"),
+        timelineFromDate: document.getElementById("timelineFromDate"),
+        timelineToDate: document.getElementById("timelineToDate"),
+        btnTimelineApply: document.getElementById("btnTimelineApply"),
+        btnTimelineReset: document.getElementById("btnTimelineReset"),
+        timelineInfo: document.getElementById("timelineInfo"),
+
+        btnSaveProject: document.getElementById("btnSaveProject"),
+        btnLoadProject: document.getElementById("btnLoadProject"),
+        btnLayout: document.getElementById("btnLayout"),
+        btnFit: document.getElementById("btnFit"),
+        pngScale: document.getElementById("pngScale"),
+        pngWhiteBg: document.getElementById("pngWhiteBg"),
+        btnExportPng2: document.getElementById("btnExportPng2"),
+
+        metaCaseId: document.getElementById("metaCaseId"),
+        metaAnalyst: document.getElementById("metaAnalyst"),
+        metaCreatedAt: document.getElementById("metaCreatedAt"),
+        metaUpdatedAt: document.getElementById("metaUpdatedAt"),
+        metaNotes: document.getElementById("metaNotes"),
+        btnApplyMeta: document.getElementById("btnApplyMeta"),
+
+        hashProject: document.getElementById("hashProject"),
+        hashPng: document.getElementById("hashPng"),
+        hashPackage: document.getElementById("hashPackage"),
+        btnRehash: document.getElementById("btnRehash"),
+        eventLogView: document.getElementById("eventLogView"),
+
+        contextMenu: document.getElementById("contextMenu"),
+        ctxDelete: document.getElementById("ctxDelete"),
+        ctxFocus: document.getElementById("ctxFocus"),
+        ctxClear: document.getElementById("ctxClear"),
+
+        selectionInfo: document.getElementById("selectionInfo"),
+        selectionEditor: document.getElementById("selectionEditor"),
+        selId: document.getElementById("selId"),
+        selType: document.getElementById("selType"),
+        selChain: document.getElementById("selChain"),
+        selLabel: document.getElementById("selLabel"),
+        selAddress: document.getElementById("selAddress"),
+        selTxid: document.getElementById("selTxid"),
+        selAmount: document.getElementById("selAmount"),
+        selFee: document.getElementById("selFee"),
+        selTimestamp: document.getElementById("selTimestamp"),
+        selConfidence: document.getElementById("selConfidence"),
+        selTags: document.getElementById("selTags"),
+        selSource: document.getElementById("selSource"),
+        selNote: document.getElementById("selNote"),
+        btnApplySelection: document.getElementById("btnApplySelection"),
+        btnDeleteSelection: document.getElementById("btnDeleteSelection"),
+
+        statusCounts: document.getElementById("statusCounts"),
+        statusSelection: document.getElementById("statusSelection")
+      };
+
+      function nowIso() {
+        return new Date().toISOString();
+      }
+
+      function toInputDateTime(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        const pad = (v) => String(v).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+
+      function fromInputDateTime(value) {
+        if (!value) return null;
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString();
+      }
+
+      function defaultFilters() {
+        return {
+          chains: {
+            BTC: true,
+            ETH: true,
+            TRON: true
+          },
+          asset: "",
+          amountMin: null,
+          amountMax: null,
+          tag: "",
+          confidenceMin: 0,
+          hideNoTimestamp: false,
+          hideIsolated: false,
+          text: ""
+        };
+      }
+
+      function normalizeTags(input) {
+        if (!input) return [];
+        if (Array.isArray(input)) {
+          return [...new Set(input.map((x) => String(x).trim()).filter(Boolean))];
+        }
+        return [...new Set(String(input).split(",").map((x) => x.trim()).filter(Boolean))];
+      }
+
+      function parseNum(value, fallback = null) {
+        if (value === "" || value === null || value === undefined) return fallback;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function clampConfidence(v) {
+        const n = parseNum(v, 0);
+        if (n < 0) return 0;
+        if (n > 1) return 1;
+        return n;
+      }
+
+      function isValidAddress(chain, address) {
+        if (!address) return false;
+        const v = String(address).trim();
+        if (chain === "BTC") return /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(v);
+        if (chain === "ETH") return /^0x[a-fA-F0-9]{40}$/.test(v);
+        if (chain === "TRON") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(v);
+        return false;
+      }
+
+      function isValidTxid(chain, txid) {
+        if (!txid) return false;
+        const v = String(txid).trim();
+        if (chain === "ETH") return /^0x[a-fA-F0-9]{64}$/.test(v);
+        if (chain === "TRON") return /^(0x)?[a-fA-F0-9]{64}$/.test(v);
+        return /^[a-fA-F0-9]{64}$/.test(v);
+      }
+
+      function assert(condition, msg) {
+        if (!condition) throw new Error(msg);
+      }
+
+      function makeId(prefix) {
+        return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function shortTx(txid) {
+        if (!txid) return "";
+        return `${txid.slice(0, 8)}...${txid.slice(-6)}`;
+      }
+
+      function showError(msg) {
+        window.alert(`Błąd: ${msg}`);
+      }
+
+      function showInfo(msg) {
+        window.alert(msg);
+      }
+
+      function chainColor(chain) {
+        return CHAIN_COLORS[chain] || "#64748b";
+      }
+
+      function safeClone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+      }
+
+      function sortKeysDeep(input) {
+        if (Array.isArray(input)) {
+          return input.map(sortKeysDeep);
+        }
+        if (input && typeof input === "object") {
+          const out = {};
+          Object.keys(input).sort().forEach((k) => {
+            out[k] = sortKeysDeep(input[k]);
+          });
+          return out;
+        }
+        return input;
+      }
+
+      async function sha256HexFromString(str) {
+        const buf = new TextEncoder().encode(str);
+        const digest = await crypto.subtle.digest("SHA-256", buf);
+        return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      async function sha256HexFromBlob(blob) {
+        const buf = await blob.arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-256", buf);
+        return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      function initCy() {
+        if (window.cytoscapeEdgehandles) cytoscape.use(window.cytoscapeEdgehandles);
+        if (window.cytoscapeUndoRedo) cytoscape.use(window.cytoscapeUndoRedo);
+        if (window.cytoscapeExpandCollapse) cytoscape.use(window.cytoscapeExpandCollapse);
+
+        cy = cytoscape({
+          container: document.getElementById("cy"),
+          wheelSensitivity: 0.2,
+          minZoom: 0.05,
+          maxZoom: 6,
+          boxSelectionEnabled: true,
+          selectionType: "additive",
+          layout: {
+            name: "cose",
+            animate: false,
+            fit: true,
+            nodeRepulsion: 9000,
+            idealEdgeLength: 130
+          },
+          style: [
+            {
+              selector: "node",
+              style: {
+                "background-color": "#ffffff",
+                "border-width": 2,
+                "border-color": "#334155",
+                label: "data(label)",
+                color: "#111827",
+                "font-size": 11,
+                "text-wrap": "wrap",
+                "text-max-width": 90,
+                "text-valign": "center",
+                "text-halign": "center",
+                width: 44,
+                height: 44
+              }
+            },
+            {
+              selector: 'node[type = "Address"]',
+              style: {
+                shape: "ellipse",
+                width: 44,
+                height: 44
+              }
+            },
+            {
+              selector: 'node[type = "Tx"]',
+              style: {
+                shape: "diamond",
+                width: 38,
+                height: 38,
+                "background-color": "#f1f5f9",
+                "border-color": "#111827"
+              }
+            },
+            {
+              selector: 'node[type = "Entity"]',
+              style: {
+                shape: "hexagon",
+                width: 56,
+                height: 48,
+                "background-color": "#f5f3ff",
+                "border-color": "#7c3aed"
+              }
+            },
+            {
+              selector: 'node[type = "Cluster"]',
+              style: {
+                shape: "round-rectangle",
+                width: "label",
+                height: 36,
+                padding: "20px",
+                "background-color": "#e2e8f0",
+                "border-color": "#334155",
+                "text-valign": "top",
+                "text-halign": "center",
+                "font-weight": 700
+              }
+            },
+            {
+              selector: "node[parent]",
+              style: {
+                "background-opacity": 0.2,
+                "border-style": "dashed"
+              }
+            },
+            {
+              selector: "node[chain = 'BTC']",
+              style: { "border-color": CHAIN_COLORS.BTC }
+            },
+            {
+              selector: "node[chain = 'ETH']",
+              style: { "border-color": CHAIN_COLORS.ETH }
+            },
+            {
+              selector: "node[chain = 'TRON']",
+              style: { "border-color": CHAIN_COLORS.TRON }
+            },
+            {
+              selector: "edge",
+              style: {
+                width: 2,
+                "line-color": "#94a3b8",
+                "target-arrow-color": "#94a3b8",
+                "target-arrow-shape": "triangle",
+                "curve-style": "bezier",
+                label: "data(displayLabel)",
+                "font-size": 9,
+                color: "#1f2937",
+                "text-background-color": "#ffffff",
+                "text-background-opacity": 0.9,
+                "text-background-padding": 2,
+                "text-wrap": "wrap",
+                "text-max-width": 120
+              }
+            },
+            {
+              selector: "edge[chain = 'BTC']",
+              style: {
+                "line-color": CHAIN_COLORS.BTC,
+                "target-arrow-color": CHAIN_COLORS.BTC
+              }
+            },
+            {
+              selector: "edge[chain = 'ETH']",
+              style: {
+                "line-color": CHAIN_COLORS.ETH,
+                "target-arrow-color": CHAIN_COLORS.ETH
+              }
+            },
+            {
+              selector: "edge[chain = 'TRON']",
+              style: {
+                "line-color": CHAIN_COLORS.TRON,
+                "target-arrow-color": CHAIN_COLORS.TRON
+              }
+            },
+            {
+              selector: "edge.synthetic",
+              style: {
+                "line-style": "dashed",
+                width: 1.6,
+                "target-arrow-shape": "triangle"
+              }
+            },
+            {
+              selector: ":selected",
+              style: {
+                "overlay-color": "#60a5fa",
+                "overlay-opacity": 0.2,
+                "overlay-padding": 8
+              }
+            },
+            {
+              selector: ".hidden-by-filter",
+              style: {
+                display: "none"
+              }
+            }
+          ],
+          elements: []
+        });
+
+        if (cy.expandCollapse) {
+          expandCollapseApi = cy.expandCollapse({
+            cueEnabled: true,
+            undoable: false,
+            animate: false,
+            fisheye: false
+          });
+        }
+
+        if (cy.undoRedo) {
+          undoRedoPlugin = cy.undoRedo({
+            isDebug: false
+          });
+          void undoRedoPlugin;
+        }
+
+        if (cy.edgehandles) {
+          edgehandles = cy.edgehandles({
+            preview: true,
+            hoverDelay: 100,
+            handleNodes: "node[type != 'Cluster']",
+            complete: function (sourceNode, targetNode) {
+              if (!state.edgeDrawingEnabled) return;
+              withHistory("Dodanie manual-link", "edge", null, () => {
+                const source = sourceNode;
+                const target = targetNode;
+                const chain = source.data("chain") || target.data("chain") || "BTC";
+                const edgeData = {
+                  id: makeId("e"),
+                  type: "manual-link",
+                  source: source.id(),
+                  target: target.id(),
+                  chain,
+                  asset: chain === "BTC" ? "BTC" : (chain === "ETH" ? "ETH" : "TRX"),
+                  amount: null,
+                  txid: "",
+                  timestamp: "",
+                  fee: null,
+                  direction: "manual",
+                  tags: ["manual"],
+                  note: "Ręcznie narysowane połączenie analityczne",
+                  confidence: 0.5,
+                  sourceId: "manual",
+                  createdAt: nowIso(),
+                  updatedAt: nowIso()
+                };
+                edgeData.displayLabel = buildEdgeLabel(edgeData);
+                cy.add({ group: "edges", data: edgeData });
+                appendEvent("ADD_EDGE", "edge", edgeData.id, null, edgeData);
+              });
+            }
+          });
+          edgehandles.disable();
+        }
+
+        cy.on("select unselect", () => {
+          renderSelection();
+          updateStatus();
+        });
+
+        cy.on("cxttap", function (evt) {
+          evt.originalEvent.preventDefault();
+          const pos = evt.renderedPosition || { x: 40, y: 40 };
+          showContextMenu(pos.x, pos.y);
+        });
+
+        cy.on("tap", function (evt) {
+          if (evt.target === cy) hideContextMenu();
+        });
+      }
+
+      function showContextMenu(x, y) {
+        const menu = els.contextMenu;
+        menu.style.left = `${Math.max(6, x)}px`;
+        menu.style.top = `${Math.max(6, y)}px`;
+        menu.style.display = "block";
+      }
+
+      function hideContextMenu() {
+        els.contextMenu.style.display = "none";
+      }
+
+      function setupTabs() {
+        els.tabs.addEventListener("click", (evt) => {
+          const btn = evt.target.closest(".tab-btn");
+          if (!btn) return;
+          const tabId = btn.getAttribute("data-tab");
+          document.querySelectorAll(".tab-btn").forEach((el) => el.classList.remove("active"));
+          document.querySelectorAll(".tab-pane").forEach((el) => el.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById(tabId).classList.add("active");
+        });
+      }
+
+      function setupInputs() {
+        els.btnAddNode.addEventListener("click", addNodeFromForm);
+        els.btnAddTransfer.addEventListener("click", addTransferFromForm);
+        els.btnAddBtcTx.addEventListener("click", addBtcTxFromForm);
+        els.btnDeleteSelected.addEventListener("click", deleteSelectedWithHistory);
+        els.btnDeleteSelection.addEventListener("click", deleteSelectedWithHistory);
+        els.btnCreateCluster.addEventListener("click", createClusterFromSelection);
+        els.btnClusterFromInputs.addEventListener("click", createClusterFromTxInputs);
+        els.btnCollapse.addEventListener("click", collapseSelectedCluster);
+        els.btnExpand.addEventListener("click", expandSelectedCluster);
+
+        els.toggleBtcSimple.addEventListener("change", () => {
+          state.uiState.btcSimpleView = !!els.toggleBtcSimple.checked;
+          withHistory("Przełączenie widoku BTC", "ui", "btc-view", () => {
+            rebuildBtcSimplifiedView();
+            applyAllFilters();
+          }, { mode: state.uiState.btcSimpleView ? "simple" : "full" });
+        });
+
+        els.btnEnableEdgeDraw.addEventListener("click", () => {
+          state.edgeDrawingEnabled = true;
+          if (edgehandles) edgehandles.enable();
+          showInfo("Edgehandles włączone.");
+        });
+
+        els.btnDisableEdgeDraw.addEventListener("click", () => {
+          state.edgeDrawingEnabled = false;
+          if (edgehandles) edgehandles.disable();
+          showInfo("Edgehandles wyłączone.");
+        });
+
+        els.btnApplyFilters.addEventListener("click", () => {
+          readFiltersFromUi();
+          applyAllFilters();
+          appendEvent("APPLY_FILTERS", "ui", "filters", null, safeClone(state.uiState.filters));
+        });
+
+        els.btnResetFilters.addEventListener("click", () => {
+          state.uiState.filters = defaultFilters();
+          writeFiltersToUi();
+          applyAllFilters();
+          appendEvent("RESET_FILTERS", "ui", "filters", null, safeClone(state.uiState.filters));
+        });
+
+        els.globalSearch.addEventListener("input", () => {
+          state.uiState.filters.text = els.globalSearch.value.trim().toLowerCase();
+          applyAllFilters();
+        });
+
+        els.btnTimelineApply.addEventListener("click", () => {
+          readTimelineFromUi();
+          applyAllFilters();
+          appendEvent("APPLY_TIMELINE", "ui", "timeline", null, safeClone(state.uiState.timeline));
+        });
+
+        els.btnTimelineReset.addEventListener("click", () => {
+          resetTimelineUi();
+          applyAllFilters();
+          appendEvent("RESET_TIMELINE", "ui", "timeline", null, safeClone(state.uiState.timeline));
+        });
+
+        els.timelineFromRange.addEventListener("input", syncTimelineFromRange);
+        els.timelineToRange.addEventListener("input", syncTimelineFromRange);
+        els.timelineFromDate.addEventListener("change", syncTimelineFromDateInputs);
+        els.timelineToDate.addEventListener("change", syncTimelineFromDateInputs);
+
+        els.btnUndo.addEventListener("click", doUndo);
+        els.btnRedo.addEventListener("click", doRedo);
+
+        els.btnSave.addEventListener("click", saveProjectToFile);
+        els.btnSaveProject.addEventListener("click", saveProjectToFile);
+        els.btnLoad.addEventListener("click", () => els.fileLoader.click());
+        els.btnLoadProject.addEventListener("click", () => els.fileLoader.click());
+        els.fileLoader.addEventListener("change", loadProjectFromInputFile);
+
+        els.btnExportPng.addEventListener("click", exportPng);
+        els.btnExportPng2.addEventListener("click", exportPng);
+
+        els.btnApplyMeta.addEventListener("click", applyMetaFromUi);
+        els.btnRehash.addEventListener("click", recomputeHashes);
+
+        els.btnLayout.addEventListener("click", () => {
+          withHistory("Przeliczenie layout", "ui", "layout", () => {
+            cy.layout({
+              name: state.uiState.layout || "cose",
+              animate: false,
+              fit: true,
+              nodeRepulsion: 9000,
+              idealEdgeLength: 130
+            }).run();
+          });
+        });
+
+        els.btnFit.addEventListener("click", () => cy.fit(undefined, 40));
+
+        els.btnApplySelection.addEventListener("click", applySelectionEdits);
+
+        els.ctxDelete.addEventListener("click", () => {
+          hideContextMenu();
+          deleteSelectedWithHistory();
+        });
+
+        els.ctxFocus.addEventListener("click", () => {
+          hideContextMenu();
+          const sel = cy.$(":selected");
+          if (sel.length) cy.fit(sel, 80);
+        });
+
+        els.ctxClear.addEventListener("click", () => {
+          hideContextMenu();
+          cy.$(":selected").unselect();
+        });
+
+        document.addEventListener("click", (evt) => {
+          if (!evt.target.closest("#contextMenu")) hideContextMenu();
+        });
+
+        document.addEventListener("keydown", (evt) => {
+          const tag = (evt.target.tagName || "").toLowerCase();
+          const editing = tag === "input" || tag === "textarea";
+
+          if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === "z") {
+            evt.preventDefault();
+            doUndo();
+          }
+          if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === "y") {
+            evt.preventDefault();
+            doRedo();
+          }
+          if (!editing && evt.key === "Delete") {
+            evt.preventDefault();
+            deleteSelectedWithHistory();
+          }
+        });
+      }
+
+      function getOrCreateAddressNode(address, chain) {
+        const normalized = String(address || "").trim();
+        const existing = cy.nodes().filter((n) => n.data("type") === "Address" && n.data("address") === normalized && n.data("chain") === chain).first();
+        if (existing && existing.length) return existing;
+
+        const id = makeId("n");
+        const data = {
+          id,
+          type: "Address",
+          chain,
+          label: normalizeAddressLabel(normalized),
+          address: normalized,
+          txid: "",
+          tags: [],
+          note: "",
+          confidence: 0.5,
+          externalId: "",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          sourceId: "manual"
+        };
+        cy.add({ group: "nodes", data });
+        return cy.getElementById(id);
+      }
+
+      function normalizeAddressLabel(addr) {
+        if (!addr) return "Address";
+        if (addr.length <= 14) return addr;
+        return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
+      }
+
+      function buildEdgeLabel(edgeData) {
+        const asset = edgeData.asset || "";
+        const amount = edgeData.amount !== null && edgeData.amount !== undefined && edgeData.amount !== "" ? edgeData.amount : "?";
+        const tx = edgeData.txid ? shortTx(edgeData.txid) : "manual";
+        return `${asset} ${amount}\n${tx}`;
+      }
+
+      function addNodeFromForm() {
+        try {
+          const type = els.nodeType.value;
+          const chain = els.nodeChain.value;
+          const label = els.nodeLabel.value.trim();
+          const address = els.nodeAddress.value.trim();
+          const txid = els.nodeTxid.value.trim();
+          const confidence = clampConfidence(els.nodeConfidence.value);
+
+          assert(label.length > 0, "Etykieta węzła jest wymagana.");
+          if (address) assert(isValidAddress(chain, address), `Niepoprawny adres dla chain=${chain}.`);
+          if (txid) assert(isValidTxid(chain, txid), `Niepoprawny txid dla chain=${chain}.`);
+
+          const nodeData = {
+            id: makeId("n"),
+            type,
+            chain,
+            label,
+            address,
+            txid,
+            tags: normalizeTags(els.nodeTags.value),
+            note: els.nodeNote.value.trim(),
+            confidence,
+            externalId: els.nodeExternalId.value.trim(),
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            sourceId: "manual"
+          };
+
+          withHistory("Dodanie węzła", "node", nodeData.id, () => {
+            cy.add({ group: "nodes", data: nodeData });
+            appendEvent("ADD_NODE", "node", nodeData.id, null, safeClone(nodeData));
+            clearNodeForm();
+          });
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function addTransferFromForm() {
+        try {
+          const fromAddress = els.trFrom.value.trim();
+          const toAddress = els.trTo.value.trim();
+          const chain = els.trChain.value;
+          const asset = (els.trAsset.value || "").trim();
+          const amount = parseNum(els.trAmount.value, null);
+          const txid = (els.trTxid.value || "").trim();
+          const timestamp = fromInputDateTime(els.trTimestamp.value);
+          const fee = parseNum(els.trFee.value, null);
+          const direction = els.trDirection.value;
+          const confidence = clampConfidence(els.trConfidence.value);
+
+          assert(fromAddress, "Pole fromAddress jest wymagane.");
+          assert(toAddress, "Pole toAddress jest wymagane.");
+          assert(isValidAddress(chain, fromAddress), `Niepoprawny fromAddress dla chain=${chain}.`);
+          assert(isValidAddress(chain, toAddress), `Niepoprawny toAddress dla chain=${chain}.`);
+          assert(asset.length > 0, "Pole asset jest wymagane.");
+          assert(amount !== null && amount >= 0, "Pole amount musi być liczbą >= 0.");
+          if (txid) assert(isValidTxid(chain, txid), `Niepoprawny txid dla chain=${chain}.`);
+
+          withHistory("Dodanie transferu", "edge", null, () => {
+            const fromNode = getOrCreateAddressNode(fromAddress, chain);
+            const toNode = getOrCreateAddressNode(toAddress, chain);
+            const edgeData = {
+              id: makeId("e"),
+              type: "transfer",
+              source: fromNode.id(),
+              target: toNode.id(),
+              chain,
+              asset,
+              amount,
+              txid,
+              timestamp,
+              fee,
+              direction,
+              tags: normalizeTags(els.trTags.value),
+              note: els.trNote.value.trim(),
+              confidence,
+              sourceId: "manual",
+              createdAt: nowIso(),
+              updatedAt: nowIso()
+            };
+            edgeData.displayLabel = buildEdgeLabel(edgeData);
+            cy.add({ group: "edges", data: edgeData });
+            appendEvent("ADD_TRANSFER", "edge", edgeData.id, null, safeClone(edgeData));
+            clearTransferForm();
+          });
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function parseBtcIoLines(raw, isOutput) {
+        const lines = String(raw || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+        const list = [];
+        lines.forEach((line, idx) => {
+          const parts = line.split(",").map((x) => x.trim());
+          if (parts.length < 2) throw new Error(`Niepoprawny format linii ${idx + 1}. Oczekiwane: address,amount[,isChange]`);
+          const address = parts[0];
+          const amount = parseNum(parts[1], null);
+          if (!isValidAddress("BTC", address)) throw new Error(`Niepoprawny BTC address w linii ${idx + 1}.`);
+          if (amount === null || amount < 0) throw new Error(`Niepoprawna amount w linii ${idx + 1}.`);
+          const item = {
+            address,
+            amount
+          };
+          if (isOutput) {
+            item.isChange = parts[2] ? String(parts[2]).toLowerCase() === "true" : false;
+          }
+          list.push(item);
+        });
+        return list;
+      }
+
+      function addBtcTxFromForm() {
+        try {
+          const txid = (els.btcTxid.value || "").trim();
+          const timestamp = fromInputDateTime(els.btcTimestamp.value);
+          const fees = parseNum(els.btcFees.value, null);
+          const confidence = clampConfidence(els.btcConfidence.value);
+          const note = (els.btcNote.value || "").trim();
+
+          assert(isValidTxid("BTC", txid), "Niepoprawny BTC txid.");
+          const inputs = parseBtcIoLines(els.btcInputs.value, false);
+          const outputs = parseBtcIoLines(els.btcOutputs.value, true);
+          assert(inputs.length > 0, "Wymagany min. 1 input.");
+          assert(outputs.length > 0, "Wymagany min. 1 output.");
+
+          withHistory("Dodanie BTC UTXO TX", "node", txid, () => {
+            const txNodeData = {
+              id: makeId("tx"),
+              type: "Tx",
+              chain: "BTC",
+              label: `BTC TX ${shortTx(txid)}`,
+              address: "",
+              txid,
+              tags: ["btc", "utxo"],
+              note,
+              confidence,
+              externalId: "",
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+              sourceId: "manual",
+              fees,
+              timestamp
+            };
+            cy.add({ group: "nodes", data: txNodeData });
+
+            inputs.forEach((input, idx) => {
+              const sourceNode = getOrCreateAddressNode(input.address, "BTC");
+              const edgeData = {
+                id: makeId("e"),
+                type: "utxo-input",
+                source: sourceNode.id(),
+                target: txNodeData.id,
+                chain: "BTC",
+                asset: "BTC",
+                amount: input.amount,
+                txid,
+                timestamp,
+                fee: null,
+                direction: "in",
+                tags: ["utxo", "input"],
+                note: `Input #${idx + 1}`,
+                confidence,
+                sourceId: "manual",
+                createdAt: nowIso(),
+                updatedAt: nowIso()
+              };
+              edgeData.displayLabel = buildEdgeLabel(edgeData);
+              cy.add({ group: "edges", data: edgeData });
+            });
+
+            outputs.forEach((output, idx) => {
+              const targetNode = getOrCreateAddressNode(output.address, "BTC");
+              const edgeData = {
+                id: makeId("e"),
+                type: "utxo-output",
+                source: txNodeData.id,
+                target: targetNode.id(),
+                chain: "BTC",
+                asset: "BTC",
+                amount: output.amount,
+                txid,
+                timestamp,
+                fee: null,
+                direction: "out",
+                tags: output.isChange ? ["utxo", "output", "change-suspect"] : ["utxo", "output"],
+                note: `Output #${idx + 1}${output.isChange ? " (change?)" : ""}`,
+                confidence,
+                sourceId: "manual",
+                createdAt: nowIso(),
+                updatedAt: nowIso(),
+                isChange: !!output.isChange
+              };
+              edgeData.displayLabel = buildEdgeLabel(edgeData);
+              cy.add({ group: "edges", data: edgeData });
+            });
+
+            appendEvent("ADD_BTC_TX", "node", txNodeData.id, null, {
+              txid,
+              inputs,
+              outputs,
+              fees,
+              timestamp
+            });
+            clearBtcForm();
+          });
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function createClusterFromSelection() {
+        try {
+          const selectedNodes = cy.nodes(":selected").filter((n) => n.data("type") !== "Cluster");
+          assert(selectedNodes.length >= 2, "Wybierz minimum 2 węzły (nie-Cluster), aby utworzyć klaster.");
+          const name = (els.clusterName.value || "").trim() || `Cluster ${new Date().toLocaleString("pl-PL")}`;
+          const tags = normalizeTags(els.clusterTags.value);
+          const firstChain = selectedNodes[0].data("chain") || "BTC";
+          const clusterId = makeId("cluster");
+
+          withHistory("Utworzenie klastra", "node", clusterId, () => {
+            const clusterData = {
+              id: clusterId,
+              type: "Cluster",
+              chain: firstChain,
+              label: name,
+              address: "",
+              txid: "",
+              tags,
+              note: "Klaster utworzony ręcznie",
+              confidence: 0.8,
+              externalId: "",
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+              sourceId: "manual"
+            };
+
+            cy.add({ group: "nodes", data: clusterData });
+            selectedNodes.forEach((n) => {
+              n.move({ parent: clusterId });
+              n.data("updatedAt", nowIso());
+            });
+            appendEvent("CREATE_CLUSTER", "node", clusterId, null, {
+              cluster: clusterData,
+              members: selectedNodes.map((n) => n.id())
+            });
+            if (expandCollapseApi) expandCollapseApi.collapse(cy.getElementById(clusterId));
+          });
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function createClusterFromTxInputs() {
+        try {
+          const selectedTx = cy.nodes(":selected").filter((n) => n.data("type") === "Tx" && n.data("chain") === "BTC").first();
+          assert(selectedTx.length > 0, "Wybierz jeden węzeł TX (BTC), aby użyć heurystyki common-input.");
+          const inputAddrs = selectedTx.incomers("edge[type = 'utxo-input']").sources().filter((n) => n.data("type") === "Address");
+          assert(inputAddrs.length >= 2, "TX musi mieć co najmniej 2 inputy adresowe.");
+
+          const suggestedName = `SUGESTIA: common-input ${shortTx(selectedTx.data("txid") || selectedTx.id())}`;
+          const clusterId = makeId("cluster");
+
+          withHistory("Utworzenie klastra z inputów TX", "node", clusterId, () => {
+            const clusterData = {
+              id: clusterId,
+              type: "Cluster",
+              chain: "BTC",
+              label: suggestedName,
+              address: "",
+              txid: selectedTx.data("txid") || "",
+              tags: ["suggested", "btc-common-input"],
+              note: "Sugestia heurystyczna. Wymaga niezależnej weryfikacji.",
+              confidence: 0.55,
+              externalId: "",
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+              sourceId: "heuristic"
+            };
+            cy.add({ group: "nodes", data: clusterData });
+            inputAddrs.forEach((n) => n.move({ parent: clusterId }));
+            appendEvent("SUGGEST_CLUSTER_COMMON_INPUT", "node", clusterId, null, {
+              txid: selectedTx.data("txid") || selectedTx.id(),
+              memberAddresses: inputAddrs.map((n) => n.data("address"))
+            });
+            if (expandCollapseApi) expandCollapseApi.collapse(cy.getElementById(clusterId));
+            showInfo("Utworzono sugerowany klaster. Oznaczony tagiem 'suggested'.");
+          });
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function collapseSelectedCluster() {
+        const selectedClusters = cy.nodes(":selected").filter((n) => n.data("type") === "Cluster");
+        if (!selectedClusters.length || !expandCollapseApi) {
+          showError("Wybierz klaster i upewnij się, że rozszerzenie expand-collapse jest aktywne.");
+          return;
+        }
+
+        withHistory("Collapse cluster", "node", selectedClusters[0].id(), () => {
+          expandCollapseApi.collapse(selectedClusters);
+          appendEvent("COLLAPSE_CLUSTER", "node", selectedClusters[0].id(), null, {
+            ids: selectedClusters.map((n) => n.id())
+          });
+        });
+      }
+
+      function expandSelectedCluster() {
+        const selectedClusters = cy.nodes(":selected").filter((n) => n.data("type") === "Cluster");
+        if (!selectedClusters.length || !expandCollapseApi) {
+          showError("Wybierz klaster i upewnij się, że rozszerzenie expand-collapse jest aktywne.");
+          return;
+        }
+
+        withHistory("Expand cluster", "node", selectedClusters[0].id(), () => {
+          expandCollapseApi.expand(selectedClusters);
+          appendEvent("EXPAND_CLUSTER", "node", selectedClusters[0].id(), null, {
+            ids: selectedClusters.map((n) => n.id())
+          });
+        });
+      }
+
+      function deleteSelectedWithHistory() {
+        const sel = cy.$(":selected");
+        if (!sel.length) {
+          showError("Brak zaznaczenia.");
+          return;
+        }
+
+        const ids = sel.map((e) => e.id());
+        withHistory("Usunięcie zaznaczonych", "mixed", ids.join(","), () => {
+          cy.remove(sel);
+          appendEvent("DELETE_SELECTED", "mixed", ids.join(","), { ids }, null);
+        });
+      }
+
+      function renderSelection() {
+        const selected = cy.$(":selected");
+        if (selected.length !== 1) {
+          els.selectionInfo.style.display = "block";
+          els.selectionEditor.style.display = "none";
+          els.selectionInfo.textContent = selected.length === 0
+            ? "Brak zaznaczenia. Wybierz węzeł lub krawędź."
+            : `Zaznaczono ${selected.length} elementów. Aby edytować atrybuty, wybierz 1 element.`;
+          return;
+        }
+
+        const el = selected[0];
+        const d = el.data();
+        const isNode = el.isNode();
+
+        els.selectionInfo.style.display = "none";
+        els.selectionEditor.style.display = "block";
+
+        els.selId.value = d.id || "";
+        els.selType.value = d.type || "";
+        els.selChain.value = d.chain || "BTC";
+        els.selLabel.value = isNode ? (d.label || "") : (d.asset || "");
+        els.selAddress.value = isNode ? (d.address || "") : (d.sourceId || "");
+        els.selTxid.value = d.txid || "";
+        els.selAmount.value = d.amount ?? "";
+        els.selFee.value = d.fee ?? "";
+        els.selTimestamp.value = toInputDateTime(d.timestamp || "");
+        els.selConfidence.value = d.confidence ?? 0;
+        els.selTags.value = Array.isArray(d.tags) ? d.tags.join(",") : "";
+        els.selSource.value = d.sourceId || "";
+        els.selNote.value = d.note || "";
+      }
+
+      function applySelectionEdits() {
+        const selected = cy.$(":selected");
+        if (selected.length !== 1) {
+          showError("Wybierz dokładnie 1 element do edycji.");
+          return;
+        }
+
+        const el = selected[0];
+        const isNode = el.isNode();
+        const before = safeClone(el.data());
+
+        try {
+          const chain = els.selChain.value;
+          const nextType = els.selType.value.trim();
+          const nextTxid = els.selTxid.value.trim();
+          const nextConfidence = clampConfidence(els.selConfidence.value);
+          const nextTimestamp = fromInputDateTime(els.selTimestamp.value);
+
+          if (nextTxid) assert(isValidTxid(chain, nextTxid), `Niepoprawny txid dla chain=${chain}.`);
+
+          if (isNode) {
+            const address = els.selAddress.value.trim();
+            if (address) assert(isValidAddress(chain, address), `Niepoprawny address dla chain=${chain}.`);
+            if (!nextType) throw new Error("Typ węzła jest wymagany.");
+
+            withHistory("Edycja węzła", "node", el.id(), () => {
+              el.data({
+                ...el.data(),
+                type: nextType,
+                chain,
+                label: els.selLabel.value.trim(),
+                address,
+                txid: nextTxid,
+                confidence: nextConfidence,
+                tags: normalizeTags(els.selTags.value),
+                note: els.selNote.value.trim(),
+                sourceId: els.selSource.value.trim(),
+                updatedAt: nowIso()
+              });
+              appendEvent("UPDATE_NODE", "node", el.id(), before, safeClone(el.data()));
+            });
+          } else {
+            const amount = parseNum(els.selAmount.value, null);
+            const fee = parseNum(els.selFee.value, null);
+            withHistory("Edycja krawędzi", "edge", el.id(), () => {
+              const data = {
+                ...el.data(),
+                type: nextType || el.data("type"),
+                chain,
+                asset: els.selLabel.value.trim(),
+                sourceId: els.selAddress.value.trim(),
+                txid: nextTxid,
+                amount,
+                fee,
+                timestamp: nextTimestamp,
+                confidence: nextConfidence,
+                tags: normalizeTags(els.selTags.value),
+                note: els.selNote.value.trim(),
+                updatedAt: nowIso()
+              };
+              data.displayLabel = buildEdgeLabel(data);
+              el.data(data);
+              appendEvent("UPDATE_EDGE", "edge", el.id(), before, safeClone(el.data()));
+            });
+          }
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      function readFiltersFromUi() {
+        const chains = { BTC: false, ETH: false, TRON: false };
+        els.fChains.forEach((cb) => {
+          chains[cb.value] = !!cb.checked;
+        });
+
+        state.uiState.filters = {
+          chains,
+          asset: (els.fAsset.value || "").trim().toLowerCase(),
+          amountMin: parseNum(els.fAmountMin.value, null),
+          amountMax: parseNum(els.fAmountMax.value, null),
+          tag: (els.fTag.value || "").trim().toLowerCase(),
+          confidenceMin: clampConfidence(els.fConfidenceMin.value),
+          hideNoTimestamp: !!els.fHideNoTs.checked,
+          hideIsolated: !!els.fHideIsolated.checked,
+          text: (els.globalSearch.value || "").trim().toLowerCase()
+        };
+      }
+
+      function writeFiltersToUi() {
+        const f = state.uiState.filters;
+        els.fChains.forEach((cb) => {
+          cb.checked = !!f.chains[cb.value];
+        });
+        els.fAsset.value = f.asset || "";
+        els.fAmountMin.value = f.amountMin ?? "";
+        els.fAmountMax.value = f.amountMax ?? "";
+        els.fConfidenceMin.value = f.confidenceMin ?? 0;
+        els.fTag.value = f.tag || "";
+        els.fHideNoTs.checked = !!f.hideNoTimestamp;
+        els.fHideIsolated.checked = !!f.hideIsolated;
+        els.globalSearch.value = f.text || "";
+      }
+
+      function updateTimelineBounds() {
+        const timestamps = cy.edges().filter((e) => !e.hasClass("synthetic")).map((e) => {
+          const ts = e.data("timestamp");
+          if (!ts) return null;
+          const n = new Date(ts).getTime();
+          return Number.isFinite(n) ? n : null;
+        }).filter(Boolean);
+
+        if (timestamps.length) {
+          const min = Math.min(...timestamps);
+          const max = Math.max(...timestamps);
+          state.uiState.timeline.min = min;
+          state.uiState.timeline.max = max;
+          if (state.uiState.timeline.from === null || state.uiState.timeline.from < min) state.uiState.timeline.from = min;
+          if (state.uiState.timeline.to === null || state.uiState.timeline.to > max) state.uiState.timeline.to = max;
+        } else {
+          const now = Date.now();
+          state.uiState.timeline.min = now - 86400000;
+          state.uiState.timeline.max = now + 86400000;
+          state.uiState.timeline.from = state.uiState.timeline.min;
+          state.uiState.timeline.to = state.uiState.timeline.max;
+        }
+
+        writeTimelineUi();
+      }
+
+      function writeTimelineUi() {
+        const t = state.uiState.timeline;
+        const min = Number(t.min || 0);
+        const max = Number(t.max || min + 1);
+        const from = Math.min(Math.max(Number(t.from || min), min), max);
+        const to = Math.max(Math.min(Number(t.to || max), max), min);
+
+        els.timelineFromRange.min = String(min);
+        els.timelineFromRange.max = String(max);
+        els.timelineToRange.min = String(min);
+        els.timelineToRange.max = String(max);
+        els.timelineFromRange.value = String(Math.min(from, to));
+        els.timelineToRange.value = String(Math.max(from, to));
+        els.timelineFromDate.value = toInputDateTime(new Date(from).toISOString());
+        els.timelineToDate.value = toInputDateTime(new Date(to).toISOString());
+        els.timelineInfo.textContent = `Zakres danych: ${new Date(min).toLocaleString("pl-PL")} - ${new Date(max).toLocaleString("pl-PL")}`;
+      }
+
+      function syncTimelineFromRange() {
+        const min = Number(els.timelineFromRange.min);
+        const max = Number(els.timelineFromRange.max);
+        let from = Number(els.timelineFromRange.value);
+        let to = Number(els.timelineToRange.value);
+        if (from > to) {
+          if (document.activeElement === els.timelineFromRange) to = from;
+          else from = to;
+        }
+        from = Math.min(Math.max(from, min), max);
+        to = Math.min(Math.max(to, min), max);
+
+        state.uiState.timeline.from = from;
+        state.uiState.timeline.to = to;
+        els.timelineFromDate.value = toInputDateTime(new Date(from).toISOString());
+        els.timelineToDate.value = toInputDateTime(new Date(to).toISOString());
+        applyAllFilters();
+      }
+
+      function syncTimelineFromDateInputs() {
+        const fromIso = fromInputDateTime(els.timelineFromDate.value);
+        const toIso = fromInputDateTime(els.timelineToDate.value);
+        if (!fromIso || !toIso) return;
+        let from = new Date(fromIso).getTime();
+        let to = new Date(toIso).getTime();
+        if (from > to) [from, to] = [to, from];
+
+        state.uiState.timeline.from = from;
+        state.uiState.timeline.to = to;
+        writeTimelineUi();
+        applyAllFilters();
+      }
+
+      function readTimelineFromUi() {
+        const fromIso = fromInputDateTime(els.timelineFromDate.value);
+        const toIso = fromInputDateTime(els.timelineToDate.value);
+        if (fromIso) state.uiState.timeline.from = new Date(fromIso).getTime();
+        if (toIso) state.uiState.timeline.to = new Date(toIso).getTime();
+        if (state.uiState.timeline.from > state.uiState.timeline.to) {
+          const tmp = state.uiState.timeline.from;
+          state.uiState.timeline.from = state.uiState.timeline.to;
+          state.uiState.timeline.to = tmp;
+        }
+        writeTimelineUi();
+      }
+
+      function resetTimelineUi() {
+        updateTimelineBounds();
+      }
+
+      function textMatch(value, needle) {
+        if (!needle) return true;
+        return String(value || "").toLowerCase().includes(needle);
+      }
+
+      function tagsMatch(tags, needle) {
+        if (!needle) return true;
+        if (!Array.isArray(tags)) return false;
+        return tags.some((t) => String(t || "").toLowerCase().includes(needle));
+      }
+
+      function applyAllFilters() {
+        readFiltersFromUi();
+
+        const f = state.uiState.filters;
+        const t = state.uiState.timeline;
+        const visibleEdges = new Set();
+
+        cy.edges().forEach((edge) => {
+          const d = edge.data();
+          const chainOk = !!f.chains[d.chain];
+          const assetOk = !f.asset || textMatch(d.asset, f.asset);
+          const amountVal = parseNum(d.amount, null);
+          const amountMinOk = f.amountMin === null || (amountVal !== null && amountVal >= f.amountMin);
+          const amountMaxOk = f.amountMax === null || (amountVal !== null && amountVal <= f.amountMax);
+          const tagOk = tagsMatch(d.tags, f.tag);
+          const confidence = parseNum(d.confidence, 0);
+          const confidenceOk = confidence >= f.confidenceMin;
+
+          const ts = d.timestamp ? new Date(d.timestamp).getTime() : null;
+          const hasTs = Number.isFinite(ts);
+          const noTsOk = !f.hideNoTimestamp || hasTs;
+          const timelineOk = !hasTs || (ts >= t.from && ts <= t.to);
+
+          const textOk = !f.text || [d.type, d.asset, d.txid, d.note, d.sourceId, Array.isArray(d.tags) ? d.tags.join(",") : ""].some((v) => textMatch(v, f.text));
+
+          const visible = chainOk && assetOk && amountMinOk && amountMaxOk && tagOk && confidenceOk && noTsOk && timelineOk && textOk;
+          if (visible) visibleEdges.add(edge.id());
+          edge.toggleClass("hidden-by-filter", !visible);
+        });
+
+        cy.nodes().forEach((node) => {
+          const d = node.data();
+          const chainOk = !!f.chains[d.chain];
+          const tagOk = tagsMatch(d.tags, f.tag);
+          const confidence = parseNum(d.confidence, 0);
+          const confidenceOk = confidence >= f.confidenceMin;
+          const textOk = !f.text || [d.type, d.label, d.address, d.txid, d.note, d.externalId, Array.isArray(d.tags) ? d.tags.join(",") : ""].some((v) => textMatch(v, f.text));
+
+          const connectedVisible = node.connectedEdges().some((e) => visibleEdges.has(e.id()));
+          const visible = chainOk && tagOk && confidenceOk && textOk && (!f.hideIsolated || connectedVisible || node.data("type") === "Cluster");
+          node.toggleClass("hidden-by-filter", !visible);
+        });
+
+        updateStatus();
+      }
+
+      function serializeElementsWithoutSynthetic() {
+        const nodes = cy.nodes().filter((n) => !n.hasClass("synthetic")).map((n) => n.json());
+        const edges = cy.edges().filter((e) => !e.hasClass("synthetic")).map((e) => e.json());
+        return { nodes, edges };
+      }
+
+      function serializeDomain() {
+        const nodes = cy.nodes().filter((n) => !n.hasClass("synthetic")).map((n) => {
+          const d = n.data();
+          return {
+            id: d.id,
+            type: d.type,
+            chain: d.chain,
+            label: d.label || "",
+            address: d.address || "",
+            txid: d.txid || "",
+            tags: normalizeTags(d.tags || []),
+            note: d.note || "",
+            confidence: parseNum(d.confidence, 0),
+            externalId: d.externalId || "",
+            createdAt: d.createdAt || nowIso(),
+            updatedAt: d.updatedAt || nowIso()
+          };
+        });
+
+        const edges = cy.edges().filter((e) => !e.hasClass("synthetic")).map((e) => {
+          const d = e.data();
+          return {
+            id: d.id,
+            type: d.type,
+            chain: d.chain,
+            asset: d.asset || "",
+            amount: parseNum(d.amount, null),
+            txid: d.txid || "",
+            timestamp: d.timestamp || "",
+            fee: parseNum(d.fee, null),
+            tags: normalizeTags(d.tags || []),
+            note: d.note || "",
+            confidence: parseNum(d.confidence, 0),
+            sourceId: d.sourceId || "",
+            createdAt: d.createdAt || nowIso(),
+            updatedAt: d.updatedAt || nowIso()
+          };
+        });
+
+        return { nodes, edges };
+      }
+
+      async function buildProjectObject() {
+        const project = {
+          version: APP_VERSION,
+          projectMeta: {
+            caseId: state.meta.caseId || "",
+            analyst: state.meta.analyst || "",
+            createdAt: state.meta.createdAt || nowIso(),
+            updatedAt: nowIso(),
+            notes: state.meta.notes || ""
+          },
+          elements: serializeElementsWithoutSynthetic(),
+          domain: serializeDomain(),
+          eventLog: safeClone(state.eventLog),
+          uiState: {
+            layout: state.uiState.layout,
+            filters: safeClone(state.uiState.filters),
+            timeline: safeClone(state.uiState.timeline),
+            btcSimpleView: !!state.uiState.btcSimpleView
+          },
+          evidence: {
+            projectSha256: "",
+            pngSha256: state.hashes.pngSha256 || "",
+            packageSha256: ""
+          }
+        };
+
+        const canonicalProject = JSON.stringify(sortKeysDeep(project));
+        const projectHash = await sha256HexFromString(canonicalProject);
+        const packageHash = await sha256HexFromString(`${projectHash}|${state.hashes.pngSha256 || ""}|${project.eventLog.length}`);
+
+        project.evidence.projectSha256 = projectHash;
+        project.evidence.packageSha256 = packageHash;
+
+        state.meta.updatedAt = project.projectMeta.updatedAt;
+        state.hashes.projectSha256 = projectHash;
+        state.hashes.packageSha256 = packageHash;
+
+        refreshHashUi();
+        refreshMetaUi();
+
+        return project;
+      }
+
+      function validateProjectSchema(obj) {
+        const errors = [];
+
+        if (!obj || typeof obj !== "object") errors.push("Plik nie zawiera obiektu JSON.");
+        if (obj.version !== APP_VERSION) errors.push(`Wersja projektu musi być ${APP_VERSION}.`);
+
+        const meta = obj.projectMeta || {};
+        if (!meta || typeof meta !== "object") errors.push("Brak projectMeta.");
+        ["caseId", "analyst", "createdAt", "updatedAt", "notes"].forEach((k) => {
+          if (!(k in meta)) errors.push(`Brak projectMeta.${k}.`);
+        });
+
+        if (!obj.elements || typeof obj.elements !== "object") {
+          errors.push("Brak elements.");
+        } else {
+          if (!Array.isArray(obj.elements.nodes)) errors.push("elements.nodes musi być tablicą.");
+          if (!Array.isArray(obj.elements.edges)) errors.push("elements.edges musi być tablicą.");
+        }
+
+        if (!obj.domain || typeof obj.domain !== "object") {
+          errors.push("Brak domain.");
+        } else {
+          if (!Array.isArray(obj.domain.nodes)) errors.push("domain.nodes musi być tablicą.");
+          if (!Array.isArray(obj.domain.edges)) errors.push("domain.edges musi być tablicą.");
+        }
+
+        if (!Array.isArray(obj.eventLog)) errors.push("eventLog musi być tablicą.");
+
+        if (obj.domain && Array.isArray(obj.domain.nodes)) {
+          obj.domain.nodes.forEach((n, idx) => {
+            ["id", "type", "chain", "label", "tags", "note", "confidence", "createdAt", "updatedAt"].forEach((k) => {
+              if (!(k in n)) errors.push(`domain.nodes[${idx}].${k} jest wymagane.`);
+            });
+          });
+        }
+
+        if (obj.domain && Array.isArray(obj.domain.edges)) {
+          obj.domain.edges.forEach((e, idx) => {
+            ["id", "type", "chain", "asset", "amount", "tags", "note", "confidence", "createdAt", "updatedAt"].forEach((k) => {
+              if (!(k in e)) errors.push(`domain.edges[${idx}].${k} jest wymagane.`);
+            });
+          });
+        }
+
+        return errors;
+      }
+
+      function takeSnapshot() {
+        return {
+          elements: serializeElementsWithoutSynthetic(),
+          meta: safeClone(state.meta),
+          uiState: safeClone(state.uiState),
+          pngHash: state.hashes.pngSha256
+        };
+      }
+
+      function restoreSnapshot(snapshot) {
+        state.historyLocked = true;
+        removeSyntheticEdges();
+        cy.elements().remove();
+        cy.add(snapshot.elements.nodes);
+        cy.add(snapshot.elements.edges);
+        state.meta = safeClone(snapshot.meta);
+        state.uiState = safeClone(snapshot.uiState);
+        state.hashes.pngSha256 = snapshot.pngHash || "";
+
+        refreshMetaUi();
+        writeFiltersToUi();
+        els.toggleBtcSimple.checked = !!state.uiState.btcSimpleView;
+
+        updateTimelineBounds();
+        rebuildBtcSimplifiedView();
+        applyAllFilters();
+        renderSelection();
+        updateStatus();
+        state.historyLocked = false;
+      }
+
+      function withHistory(label, targetType, targetId, mutateFn, payloadAfter = null, payloadBefore = null) {
+        if (state.historyLocked) {
+          mutateFn();
+          return;
+        }
+
+        const beforeSnap = takeSnapshot();
+        mutateFn();
+
+        const afterSnap = takeSnapshot();
+        const beforeStr = JSON.stringify(beforeSnap.elements);
+        const afterStr = JSON.stringify(afterSnap.elements);
+
+        if (beforeStr !== afterStr || JSON.stringify(beforeSnap.meta) !== JSON.stringify(afterSnap.meta) || JSON.stringify(beforeSnap.uiState) !== JSON.stringify(afterSnap.uiState)) {
+          state.undoStack.push({ label, before: beforeSnap, after: afterSnap });
+          state.redoStack = [];
+          updateUndoRedoButtons();
+        }
+
+        state.meta.updatedAt = nowIso();
+        refreshMetaUi();
+        updateTimelineBounds();
+        rebuildBtcSimplifiedView();
+        applyAllFilters();
+        renderSelection();
+        void recomputeHashes();
+
+        if (targetType && targetId) {
+          appendEvent("MUTATION", targetType, targetId, payloadBefore, payloadAfter || { label });
+        }
+      }
+
+      function doUndo() {
+        const item = state.undoStack.pop();
+        if (!item) return;
+        state.redoStack.push(item);
+        restoreSnapshot(item.before);
+        appendEvent("UNDO", "history", item.label, { action: item.label }, null);
+        updateUndoRedoButtons();
+        void recomputeHashes();
+      }
+
+      function doRedo() {
+        const item = state.redoStack.pop();
+        if (!item) return;
+        state.undoStack.push(item);
+        restoreSnapshot(item.after);
+        appendEvent("REDO", "history", item.label, null, { action: item.label });
+        updateUndoRedoButtons();
+        void recomputeHashes();
+      }
+
+      function updateUndoRedoButtons() {
+        els.btnUndo.disabled = state.undoStack.length === 0;
+        els.btnRedo.disabled = state.redoStack.length === 0;
+      }
+
+      function appendEvent(action, targetType, targetId, before, after) {
+        const evt = {
+          ts: nowIso(),
+          actor: state.meta.analyst || "unknown",
+          action,
+          targetType,
+          targetId,
+          before: before ?? null,
+          after: after ?? null
+        };
+        state.eventLog.push(evt);
+        renderEventLog();
+      }
+
+      function renderEventLog() {
+        els.eventLogView.innerHTML = "";
+        const items = state.eventLog.slice(-200).reverse();
+        items.forEach((evt) => {
+          const div = document.createElement("div");
+          div.className = "log-item";
+          div.textContent = `[${new Date(evt.ts).toLocaleString("pl-PL")}] ${evt.actor} | ${evt.action} | ${evt.targetType}:${evt.targetId}`;
+          els.eventLogView.appendChild(div);
+        });
+      }
+
+      function refreshMetaUi() {
+        els.metaCaseId.value = state.meta.caseId || "";
+        els.metaAnalyst.value = state.meta.analyst || "";
+        els.metaCreatedAt.value = toInputDateTime(state.meta.createdAt || nowIso());
+        els.metaUpdatedAt.value = new Date(state.meta.updatedAt || nowIso()).toLocaleString("pl-PL");
+        els.metaNotes.value = state.meta.notes || "";
+      }
+
+      function applyMetaFromUi() {
+        const before = safeClone(state.meta);
+        withHistory("Edycja metadanych", "projectMeta", "meta", () => {
+          state.meta.caseId = (els.metaCaseId.value || "").trim();
+          state.meta.analyst = (els.metaAnalyst.value || "").trim();
+          state.meta.createdAt = fromInputDateTime(els.metaCreatedAt.value) || state.meta.createdAt || nowIso();
+          state.meta.notes = (els.metaNotes.value || "").trim();
+          state.meta.updatedAt = nowIso();
+          appendEvent("UPDATE_META", "projectMeta", "meta", before, safeClone(state.meta));
+        });
+      }
+
+      function updateStatus() {
+        const nodesTotal = cy.nodes().filter((n) => !n.hasClass("synthetic")).length;
+        const edgesTotal = cy.edges().filter((e) => !e.hasClass("synthetic")).length;
+        const nodesVisible = cy.nodes().filter((n) => n.visible()).length;
+        const edgesVisible = cy.edges().filter((e) => e.visible()).length;
+        els.statusCounts.textContent = `Nodes: ${nodesVisible}/${nodesTotal}, Edges: ${edgesVisible}/${edgesTotal}, Log: ${state.eventLog.length}`;
+
+        const selected = cy.$(":selected");
+        if (!selected.length) {
+          els.statusSelection.textContent = "Zaznaczenie: brak";
+        } else if (selected.length === 1) {
+          const d = selected[0].data();
+          els.statusSelection.textContent = `Zaznaczenie: ${d.id} (${d.type || (selected[0].isNode() ? "node" : "edge")})`;
+        } else {
+          els.statusSelection.textContent = `Zaznaczenie: ${selected.length} elementów`;
+        }
+      }
+
+      async function recomputeHashes() {
+        try {
+          const project = await buildProjectObject();
+          state.hashes.projectSha256 = project.evidence.projectSha256;
+          state.hashes.packageSha256 = project.evidence.packageSha256;
+          refreshHashUi();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      function refreshHashUi() {
+        els.hashProject.value = state.hashes.projectSha256 || "";
+        els.hashPng.value = state.hashes.pngSha256 || "";
+        els.hashPackage.value = state.hashes.packageSha256 || "";
+      }
+
+      async function saveProjectToFile() {
+        try {
+          const project = await buildProjectObject();
+          const json = JSON.stringify(project, null, 2);
+          const blob = new Blob([json], { type: "application/json" });
+          downloadBlob(blob, `${(state.meta.caseId || "crypto-flow-project").replace(/\s+/g, "_")}.json`);
+          appendEvent("SAVE_PROJECT", "project", state.meta.caseId || "project", null, {
+            sizeBytes: blob.size,
+            hash: project.evidence.projectSha256
+          });
+        } catch (err) {
+          showError(`Nie udało się zapisać projektu: ${err.message}`);
+        }
+      }
+
+      async function loadProjectFromInputFile() {
+        const file = els.fileLoader.files && els.fileLoader.files[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          const obj = JSON.parse(text);
+          const errors = validateProjectSchema(obj);
+          if (errors.length) {
+            showError(`Walidacja projektu nie przeszła:\n- ${errors.join("\n- ")}`);
+            return;
+          }
+
+          withHistory("Wczytanie projektu", "project", obj.projectMeta.caseId || "project", () => {
+            removeSyntheticEdges();
+            cy.elements().remove();
+            cy.add(obj.elements.nodes);
+            cy.add(obj.elements.edges);
+
+            state.meta = {
+              caseId: obj.projectMeta.caseId || "",
+              analyst: obj.projectMeta.analyst || "",
+              createdAt: obj.projectMeta.createdAt || nowIso(),
+              updatedAt: obj.projectMeta.updatedAt || nowIso(),
+              notes: obj.projectMeta.notes || ""
+            };
+
+            state.eventLog = Array.isArray(obj.eventLog) ? obj.eventLog : [];
+            state.uiState.layout = (obj.uiState && obj.uiState.layout) || "cose";
+            state.uiState.filters = (obj.uiState && obj.uiState.filters) ? obj.uiState.filters : defaultFilters();
+            state.uiState.timeline = (obj.uiState && obj.uiState.timeline) ? obj.uiState.timeline : state.uiState.timeline;
+            state.uiState.btcSimpleView = !!(obj.uiState && obj.uiState.btcSimpleView);
+
+            state.hashes.projectSha256 = obj.evidence && obj.evidence.projectSha256 ? obj.evidence.projectSha256 : "";
+            state.hashes.pngSha256 = obj.evidence && obj.evidence.pngSha256 ? obj.evidence.pngSha256 : "";
+            state.hashes.packageSha256 = obj.evidence && obj.evidence.packageSha256 ? obj.evidence.packageSha256 : "";
+
+            state.loadedFromFile = true;
+
+            writeFiltersToUi();
+            refreshMetaUi();
+            renderEventLog();
+            refreshHashUi();
+            els.toggleBtcSimple.checked = state.uiState.btcSimpleView;
+
+            updateTimelineBounds();
+            rebuildBtcSimplifiedView();
+            applyAllFilters();
+            cy.layout({ name: state.uiState.layout || "cose", animate: false, fit: true }).run();
+            appendEvent("LOAD_PROJECT", "project", state.meta.caseId || "project", null, {
+              filename: file.name,
+              importedAt: nowIso()
+            });
+          });
+
+          showInfo("Projekt wczytany poprawnie.");
+        } catch (err) {
+          showError(`Nie udało się wczytać pliku: ${err.message}`);
+        } finally {
+          els.fileLoader.value = "";
+        }
+      }
+
+      function base64ToBlob(base64, type) {
+        const byteString = atob(base64.split(",")[1]);
+        const arr = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i += 1) arr[i] = byteString.charCodeAt(i);
+        return new Blob([arr], { type });
+      }
+
+      async function exportPng() {
+        try {
+          const scale = Math.max(1, Math.min(8, parseInt(els.pngScale.value || "3", 10)));
+          const bg = els.pngWhiteBg.checked ? "#ffffff" : "transparent";
+          const pngBase64 = cy.png({
+            full: false,
+            bg,
+            scale
+          });
+          const blob = base64ToBlob(pngBase64, "image/png");
+          const hash = await sha256HexFromBlob(blob);
+          state.hashes.pngSha256 = hash;
+          await recomputeHashes();
+          downloadBlob(blob, `${(state.meta.caseId || "crypto-flow").replace(/\s+/g, "_")}_${Date.now()}.png`);
+          appendEvent("EXPORT_PNG", "evidence", "png", null, {
+            scale,
+            bg,
+            hash,
+            sizeBytes: blob.size
+          });
+          refreshHashUi();
+        } catch (err) {
+          showError(`Eksport PNG nieudany: ${err.message}`);
+        }
+      }
+
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function clearNodeForm() {
+        els.nodeLabel.value = "";
+        els.nodeAddress.value = "";
+        els.nodeTxid.value = "";
+        els.nodeTags.value = "";
+        els.nodeNote.value = "";
+        els.nodeExternalId.value = "";
+        els.nodeConfidence.value = "0.7";
+      }
+
+      function clearTransferForm() {
+        els.trFrom.value = "";
+        els.trTo.value = "";
+        els.trAmount.value = "";
+        els.trTxid.value = "";
+        els.trTimestamp.value = "";
+        els.trFee.value = "";
+        els.trTags.value = "";
+        els.trNote.value = "";
+        els.trConfidence.value = "0.8";
+      }
+
+      function clearBtcForm() {
+        els.btcTxid.value = "";
+        els.btcTimestamp.value = "";
+        els.btcFees.value = "";
+        els.btcInputs.value = "";
+        els.btcOutputs.value = "";
+        els.btcNote.value = "";
+        els.btcConfidence.value = "0.85";
+      }
+
+      function removeSyntheticEdges() {
+        cy.elements(".synthetic").remove();
+      }
+
+      function rebuildBtcSimplifiedView() {
+        removeSyntheticEdges();
+
+        const simple = !!state.uiState.btcSimpleView;
+        if (!simple) {
+          cy.nodes("[type = 'Tx'][chain = 'BTC']").removeClass("hidden-by-filter");
+          cy.edges("[type = 'utxo-input'], [type = 'utxo-output']").removeClass("hidden-by-filter");
+          return;
+        }
+
+        const txNodes = cy.nodes("[type = 'Tx'][chain = 'BTC']");
+        txNodes.forEach((tx) => {
+          const txid = tx.data("txid") || tx.id();
+          const ts = tx.data("timestamp") || null;
+          const inEdges = tx.incomers("edge[type = 'utxo-input']");
+          const outEdges = tx.outgoers("edge[type = 'utxo-output']");
+          const inAddrs = inEdges.sources("node");
+          const outAddrs = outEdges.targets("node");
+
+          if (!inAddrs.length || !outAddrs.length) return;
+
+          outAddrs.forEach((dst, outIdx) => {
+            const outEdge = outEdges[outIdx];
+            const outAmount = parseNum(outEdge ? outEdge.data("amount") : null, null);
+            const splitAmount = outAmount !== null && inAddrs.length ? outAmount / inAddrs.length : null;
+            inAddrs.forEach((src) => {
+              const sid = `synth_${src.id()}_${dst.id()}_${txid.slice(0, 12)}_${Math.random().toString(36).slice(2, 6)}`;
+              const edgeData = {
+                id: sid,
+                type: "utxo-aggregated",
+                source: src.id(),
+                target: dst.id(),
+                chain: "BTC",
+                asset: "BTC",
+                amount: splitAmount,
+                txid,
+                timestamp: ts,
+                fee: null,
+                direction: "out",
+                tags: ["synthetic", "utxo-simplified"],
+                note: "Widok uproszczony BTC (przybliżony podział output/input)",
+                confidence: 0.5,
+                sourceId: "derived",
+                createdAt: nowIso(),
+                updatedAt: nowIso(),
+                displayLabel: `BTC ${splitAmount !== null ? splitAmount.toFixed(8) : "?"}\n${shortTx(txid)}`
+              };
+              cy.add({ group: "edges", data: edgeData, classes: "synthetic" });
+            });
+          });
+
+          tx.addClass("hidden-by-filter");
+          inEdges.addClass("hidden-by-filter");
+          outEdges.addClass("hidden-by-filter");
+        });
+      }
+
+      function exportDomainValidationHints() {
+        const issues = [];
+        cy.nodes().filter((n) => !n.hasClass("synthetic")).forEach((n) => {
+          const d = n.data();
+          if (!d.id || !d.type || !d.chain) issues.push(`node:${d.id} brakuje pól krytycznych.`);
+        });
+        cy.edges().filter((e) => !e.hasClass("synthetic")).forEach((e) => {
+          const d = e.data();
+          if (!d.id || !d.type || !d.chain || !d.asset) issues.push(`edge:${d.id} brakuje pól krytycznych.`);
+        });
+        return issues;
+      }
+
+      function seedInitialData() {
+        state.meta.caseId = "";
+        state.meta.analyst = "";
+        state.meta.createdAt = nowIso();
+        state.meta.updatedAt = nowIso();
+        state.meta.notes = "";
+        state.eventLog = [];
+        state.hashes.projectSha256 = "";
+        state.hashes.packageSha256 = "";
+        state.hashes.pngSha256 = "";
+        appendEvent("INIT_PROJECT", "project", "new", null, { version: APP_VERSION });
+      }
+
+      function initFormDefaults() {
+        writeFiltersToUi();
+        refreshMetaUi();
+        resetTimelineUi();
+        renderEventLog();
+        refreshHashUi();
+      }
+
+      function init() {
+        initCy();
+        setupTabs();
+        setupInputs();
+        seedInitialData();
+        initFormDefaults();
+        updateUndoRedoButtons();
+        updateStatus();
+        applyAllFilters();
+
+        void recomputeHashes();
+
+        // Przegląd integralności danych po starcie (wyłącznie lokalnie).
+        const validationIssues = exportDomainValidationHints();
+        if (validationIssues.length) {
+          console.warn("Wykryto problemy integralności:", validationIssues);
+        }
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
